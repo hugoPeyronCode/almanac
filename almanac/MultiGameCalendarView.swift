@@ -23,6 +23,11 @@ struct MultiGameCalendarView: View {
   @State private var isCompactMode = true
   @State private var showingCompletionCelebration = false
 
+  // MARK: - Game Filter State
+  @State private var selectedGames: Set<GameType> = Set(GameType.allCases)
+  @State private var showingAllGames = true
+  @State private var showingFilters = false
+
   private let levelManager = LevelManager.shared
   private let calendar = Calendar.current
 
@@ -33,6 +38,7 @@ struct MultiGameCalendarView: View {
 
         ScrollView(.vertical, showsIndicators: false) {
           VStack(spacing: 32) {
+            gameFilterSection
             calendarSection
             selectedDateSection
             quickStatsSection
@@ -51,7 +57,7 @@ struct MultiGameCalendarView: View {
       .alert("🎉 Day Complete!", isPresented: $showingCompletionCelebration) {
         Button("Great!") { }
       } message: {
-        Text("You've completed all 4 games for \(selectedDateTitle)! 🏆")
+        Text("You've completed all \(selectedGames.count) selected games for \(selectedDateTitle)! 🏆")
       }
     }
     .sheet(item: $coordinator.presentedSheet) { destination in
@@ -76,22 +82,29 @@ struct MultiGameCalendarView: View {
 
   private var headerView: some View {
     HStack {
-      Image(systemName: "puzzlepiece.extension.fill")
-        .font(.title2)
-        .foregroundStyle(.primary)
-
-      Text("Daily Puzzles")
+      Text("THE ALMANAC")
+        .monospaced()
         .font(.title)
-        .fontWeight(.bold)
+        .fontWeight(.black)
 
       Spacer()
+
+      Button {
+        withAnimation(.bouncy){
+        showingFilters.toggle()
+      }
+      } label: {
+        Image(systemName: showingFilters ? "line.3.horizontal.decrease.circle" : "line.3.horizontal.decrease.circle.fill")
+          .font(.title2)
+          .foregroundStyle(Color.secondary)
+      }
 
       Button {
         coordinator.push(.practiceMode)
       } label: {
         Image(systemName: "dumbbell.fill")
           .font(.title2)
-          .foregroundStyle(.primary)
+          .foregroundStyle(Color.primary)
       }
       .sensoryFeedback(.impact(weight: .light), trigger: false)
 
@@ -100,12 +113,35 @@ struct MultiGameCalendarView: View {
       } label: {
         Image(systemName: "chart.line.uptrend.xyaxis")
           .font(.title2)
-          .foregroundStyle(.primary)
+          .foregroundStyle(Color.primary)
       }
       .sensoryFeedback(.impact(weight: .light), trigger: false)
     }
     .padding(.horizontal)
     .padding(.top, 8)
+  }
+
+  // MARK: - Game Filter Section
+  @ViewBuilder
+  private var gameFilterSection: some View {
+      if showingFilters {
+        ScrollView(.horizontal, showsIndicators: false) {
+          HStack(spacing: 12) {
+            ForEach(GameType.allCases, id: \.self) { gameType in
+              GameFilterChip(
+                gameType: gameType,
+                isSelected: selectedGames.contains(gameType),
+                progress: getGameProgress(gameType)
+              ) {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                  toggleGameSelection(gameType)
+                }
+              }
+            }
+          }
+          .padding(.horizontal)
+        }
+    }
   }
 
   // MARK: - Calendar Section
@@ -133,7 +169,7 @@ struct MultiGameCalendarView: View {
       } label: {
         Image(systemName: "chevron.left")
           .font(.title3)
-          .foregroundStyle(.secondary)
+          .foregroundStyle(Color.secondary)
       }
       .sensoryFeedback(.impact(weight: .light), trigger: currentMonth)
 
@@ -150,7 +186,7 @@ struct MultiGameCalendarView: View {
       } label: {
         Image(systemName: "location")
           .font(.title3)
-          .foregroundStyle(.secondary)
+          .foregroundStyle(Color.secondary)
       }
       .sensoryFeedback(.impact(weight: .light), trigger: selectedDate)
 
@@ -161,7 +197,7 @@ struct MultiGameCalendarView: View {
       } label: {
         Image(systemName: isCompactMode ? "rectangle.grid.3x2" : "rectangle.compress.vertical")
           .font(.title3)
-          .foregroundStyle(.secondary)
+          .foregroundStyle(Color.secondary)
       }
       .sensoryFeedback(.impact(weight: .light), trigger: isCompactMode)
 
@@ -170,7 +206,7 @@ struct MultiGameCalendarView: View {
       } label: {
         Image(systemName: "chevron.right")
           .font(.title3)
-          .foregroundStyle(.secondary)
+          .foregroundStyle(Color.secondary)
       }
       .sensoryFeedback(.impact(weight: .light), trigger: currentMonth)
     }
@@ -185,7 +221,7 @@ struct MultiGameCalendarView: View {
             CalendarDayView(
               day: day,
               isSelected: calendar.isDate(day.date, inSameDayAs: selectedDate),
-              completionStatus: getDayCompletionStatus(day.date),
+              completionStatus: getFilteredDayCompletionStatus(day.date),
               isCompact: true
             ) {
               selectDate(day.date)
@@ -214,7 +250,7 @@ struct MultiGameCalendarView: View {
         CalendarDayView(
           day: day,
           isSelected: calendar.isDate(day.date, inSameDayAs: selectedDate),
-          completionStatus: getDayCompletionStatus(day.date),
+          completionStatus: getFilteredDayCompletionStatus(day.date),
           isCompact: false
         ) {
           selectDate(day.date)
@@ -235,10 +271,10 @@ struct MultiGameCalendarView: View {
 
         Spacer()
 
-        let completedCount = getTotalCompletedToday()
-        let totalGames = GameType.allCases.count
+        let completedCount = getFilteredTotalCompletedToday()
+        let totalGames = selectedGames.count
 
-        if completedCount > 0 {
+        if completedCount > 0 && totalGames > 0 {
           HStack(spacing: 6) {
             if completedCount == totalGames {
               Image(systemName: "crown.fill")
@@ -272,24 +308,42 @@ struct MultiGameCalendarView: View {
         }
       }
 
-      LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 16), count: 2), spacing: 16) {
-        ForEach(GameType.allCases, id: \.self) { gameType in
-          GameDayCard(
-            gameType: gameType,
-            date: selectedDate,
-            level: levelManager.getLevelForDate(selectedDate, gameType: gameType),
-            isCompleted: isGameCompletedForDate(selectedDate, gameType: gameType),
-            progress: getGameProgress(gameType),
-            onTap: {
-              if let level = levelManager.getLevelForDate(selectedDate, gameType: gameType) {
-                coordinator.startGame(
-                  gameType: gameType,
-                  level: level,
-                  context: .daily(selectedDate)
-                )
+      if selectedGames.isEmpty {
+        VStack(spacing: 16) {
+          Image(systemName: "gamecontroller")
+            .font(.system(size: 48))
+            .foregroundStyle(.secondary)
+
+          Text("No games selected")
+            .font(.headline)
+            .foregroundStyle(.secondary)
+
+          Text("Select games above to see your daily puzzles")
+            .font(.subheadline)
+            .foregroundStyle(.tertiary)
+            .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity, minHeight: 120)
+      } else {
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 16), count: 2), spacing: 16) {
+          ForEach(Array(selectedGames).sorted(by: { $0.rawValue < $1.rawValue }), id: \.self) { gameType in
+            GameDayCard(
+              gameType: gameType,
+              date: selectedDate,
+              level: levelManager.getLevelForDate(selectedDate, gameType: gameType),
+              isCompleted: isGameCompletedForDate(selectedDate, gameType: gameType),
+              progress: getGameProgress(gameType),
+              onTap: {
+                if let level = levelManager.getLevelForDate(selectedDate, gameType: gameType) {
+                  coordinator.startGame(
+                    gameType: gameType,
+                    level: level,
+                    context: .daily(selectedDate)
+                  )
+                }
               }
-            }
-          )
+            )
+          }
         }
       }
     }
@@ -305,43 +359,146 @@ struct MultiGameCalendarView: View {
           .font(.headline)
           .fontWeight(.medium)
 
+        if !selectedGames.isEmpty && selectedGames.count < GameType.allCases.count {
+          Text("(\(selectedGames.count) games)")
+            .font(.caption)
+            .foregroundStyle(Color.secondary)
+        }
+
         Spacer()
       }
 
-      LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 16), count: 4), spacing: 16) {
-        StatCard(
-          value: getTotalCompletedGames(),
-          label: "Total\nCompleted",
-          icon: "checkmark.circle.fill",
-          color: .green
-        )
+      if selectedGames.isEmpty {
+        Text("Select games to see statistics")
+          .font(.subheadline)
+          .foregroundStyle(Color.secondary)
+          .frame(maxWidth: .infinity, minHeight: 80)
+      } else {
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 16), count: 4), spacing: 16) {
+          StatCard(
+            value: getFilteredTotalCompletedGames(),
+            label: "Total\nCompleted",
+            icon: "checkmark.circle.fill",
+            color: .green
+          )
 
-        StatCard(
-          value: getCurrentStreak(),
-          label: "Current\nStreak",
-          icon: "flame.fill",
-          color: .orange
-        )
+          StatCard(
+            value: getFilteredCurrentStreak(),
+            label: "Current\nStreak",
+            icon: "flame.fill",
+            color: .orange
+          )
 
-        StatCard(
-          value: getMaxStreak(),
-          label: "Best\nStreak",
-          icon: "star.fill",
-          color: .yellow
-        )
+          StatCard(
+            value: getFilteredMaxStreak(),
+            label: "Best\nStreak",
+            icon: "star.fill",
+            color: .yellow
+          )
 
-        StatCard(
-          value: getPerfectDaysCount(),
-          label: "Perfect\nDays",
-          icon: "crown.fill",
-          color: .purple
-        )
+          StatCard(
+            value: getFilteredPerfectDaysCount(),
+            label: "Perfect\nDays",
+            icon: "crown.fill",
+            color: .purple
+          )
+        }
       }
     }
     .padding(.horizontal)
   }
 
-  // MARK: - Navigation Content
+  // MARK: - Game Filter Logic
+
+  private func toggleGameSelection(_ gameType: GameType) {
+    if selectedGames.contains(gameType) {
+      selectedGames.remove(gameType)
+    } else {
+      selectedGames.insert(gameType)
+    }
+    updateSelectAllState()
+  }
+
+  private func toggleSelectAll() {
+    if showingAllGames {
+      selectedGames.removeAll()
+      showingAllGames = false
+    } else {
+      selectedGames = Set(GameType.allCases)
+      showingAllGames = true
+    }
+  }
+
+  private func updateSelectAllState() {
+    showingAllGames = selectedGames.count == GameType.allCases.count
+  }
+
+  // MARK: - Filtered Data Methods
+
+  private func getFilteredDayCompletionStatus(_ date: Date) -> DayCompletionStatus {
+    let completedGames = selectedGames.filter { gameType in
+      isGameCompletedForDate(date, gameType: gameType)
+    }
+
+    if completedGames.count == selectedGames.count && !selectedGames.isEmpty {
+      return .allCompleted
+    } else if !completedGames.isEmpty {
+      return .partiallyCompleted(completedGames.count, selectedGames.count)
+    } else {
+      return .none
+    }
+  }
+
+  private func getFilteredTotalCompletedToday() -> Int {
+    return selectedGames.filter { gameType in
+      isGameCompletedForDate(selectedDate, gameType: gameType)
+    }.count
+  }
+
+  private func getFilteredTotalCompletedGames() -> Int {
+    return allProgress
+      .filter { selectedGames.contains($0.gameType) }
+      .reduce(0) { $0 + $1.totalCompleted }
+  }
+
+  private func getFilteredCurrentStreak() -> Int {
+    return allProgress
+      .filter { selectedGames.contains($0.gameType) }
+      .map(\.currentStreak)
+      .max() ?? 0
+  }
+
+  private func getFilteredMaxStreak() -> Int {
+    return allProgress
+      .filter { selectedGames.contains($0.gameType) }
+      .map(\.maxStreak)
+      .max() ?? 0
+  }
+
+  private func getFilteredPerfectDaysCount() -> Int {
+    let calendar = Calendar.current
+    let today = Date()
+    let thirtyDaysAgo = calendar.date(byAdding: .day, value: -30, to: today) ?? today
+
+    var perfectDays = 0
+    var checkDate = thirtyDaysAgo
+
+    while checkDate <= today {
+      let completedGames = selectedGames.filter { gameType in
+        isGameCompletedForDate(checkDate, gameType: gameType)
+      }
+
+      if completedGames.count == selectedGames.count && !selectedGames.isEmpty {
+        perfectDays += 1
+      }
+
+      checkDate = calendar.date(byAdding: .day, value: 1, to: checkDate) ?? today
+    }
+
+    return perfectDays
+  }
+
+  // MARK: - Navigation Content (Keep existing implementation)
 
   @ViewBuilder
   private func navigationContent(for destination: GameCoordinator.NavigationDestination) -> some View {
@@ -399,108 +556,7 @@ struct MultiGameCalendarView: View {
     }
   }
 
-  // MARK: - Helper Methods
-
-  private func simulateGameCompletion(gameType: GameType, date: Date) {
-    guard let progressManager = progressManager,
-          let level = levelManager.getLevelForDate(date, gameType: gameType) else { return }
-
-    // Check if already completed
-    if progressManager.hasCompletedDate(date, gameType: gameType) {
-      print("⚠️ Game already completed for \(gameType.displayName) on \(date)")
-      return
-    }
-
-    // Create a mock completion
-    let completion = DailyCompletion(
-      date: date,
-      gameType: gameType,
-      levelDataId: level.id,
-      completionTime: Double.random(in: 30...300)
-    )
-
-    modelContext.insert(completion)
-
-    // Update game progress
-    let fetchDescriptor = FetchDescriptor<GameProgress>(
-      predicate: #Predicate<GameProgress> { $0.gameType == gameType }
-    )
-
-    if let progress = try? modelContext.fetch(fetchDescriptor).first {
-      progress.updateProgress(completionTime: completion.completionTime)
-    } else {
-      let newProgress = GameProgress(gameType: gameType)
-      newProgress.updateProgress(completionTime: completion.completionTime)
-      modelContext.insert(newProgress)
-    }
-
-    // Update streaks
-    updateStreaksForGame(gameType, date: date)
-
-    do {
-      try modelContext.save()
-      print("✅ Simulated completion for \(gameType.displayName) on \(date)")
-
-      // Check if all games for this date are now completed
-      if checkDayComplete(date) {
-        withAnimation(.easeInOut(duration: 0.3)) {
-          showingCompletionCelebration = true
-        }
-      }
-    } catch {
-      print("❌ Failed to save simulated completion: \(error)")
-    }
-  }
-
-  private func checkDayComplete(_ date: Date) -> Bool {
-    let completedGames = GameType.allCases.filter { gameType in
-      isGameCompletedForDate(date, gameType: gameType)
-    }
-
-    return completedGames.count == GameType.allCases.count
-  }
-
-  private func updateStreaksForGame(_ gameType: GameType, date: Date) {
-    let today = Date()
-    let calendar = Calendar.current
-    var streakCount = 0
-    var checkDate = today
-
-    while true {
-      if hasCompletedDateForStreak(checkDate, gameType: gameType) {
-        streakCount += 1
-        guard let previousDay = calendar.date(byAdding: .day, value: -1, to: checkDate) else { break }
-        checkDate = previousDay
-      } else {
-        break
-      }
-    }
-
-    let fetchDescriptor = FetchDescriptor<GameProgress>(
-      predicate: #Predicate<GameProgress> { $0.gameType == gameType }
-    )
-
-    if let progress = try? modelContext.fetch(fetchDescriptor).first {
-      progress.currentStreak = streakCount
-      progress.maxStreak = max(progress.maxStreak, streakCount)
-    }
-  }
-
-  private func hasCompletedDateForStreak(_ date: Date, gameType: GameType) -> Bool {
-    let startOfDay = Calendar.current.startOfDay(for: date)
-    let endOfDay = Calendar.current.date(byAdding: .day, value: 1, to: startOfDay)!
-
-    let fetchDescriptor = FetchDescriptor<DailyCompletion>(
-      predicate: #Predicate<DailyCompletion> { completion in
-        completion.gameType == gameType &&
-        completion.date >= startOfDay &&
-        completion.date < endOfDay
-      }
-    )
-
-    let completions = (try? modelContext.fetch(fetchDescriptor)) ?? []
-    return !completions.isEmpty
-  }
+  // MARK: - Helper Methods (Keep existing implementation but update for filtered data)
 
   private func navigateMonth(direction: Int) {
     withAnimation(.spring(duration: 0.3)) {
@@ -580,61 +636,6 @@ struct MultiGameCalendarView: View {
     return days
   }
 
-  private func getDayCompletionStatus(_ date: Date) -> DayCompletionStatus {
-    let completedGames = GameType.allCases.filter { gameType in
-      isGameCompletedForDate(date, gameType: gameType)
-    }
-
-    if completedGames.count == GameType.allCases.count {
-      return .allCompleted
-    } else if !completedGames.isEmpty {
-      return .partiallyCompleted(completedGames.count, GameType.allCases.count)
-    } else {
-      return .none
-    }
-  }
-
-  private func getTotalCompletedToday() -> Int {
-    return GameType.allCases.filter { gameType in
-      isGameCompletedForDate(selectedDate, gameType: gameType)
-    }.count
-  }
-
-  private func getTotalCompletedGames() -> Int {
-    return allProgress.reduce(0) { $0 + $1.totalCompleted }
-  }
-
-  private func getCurrentStreak() -> Int {
-    return allProgress.map(\.currentStreak).max() ?? 0
-  }
-
-  private func getMaxStreak() -> Int {
-    return allProgress.map(\.maxStreak).max() ?? 0
-  }
-
-  private func getPerfectDaysCount() -> Int {
-    let calendar = Calendar.current
-    let today = Date()
-    let thirtyDaysAgo = calendar.date(byAdding: .day, value: -30, to: today) ?? today
-
-    var perfectDays = 0
-    var checkDate = thirtyDaysAgo
-
-    while checkDate <= today {
-      let completedGames = GameType.allCases.filter { gameType in
-        isGameCompletedForDate(checkDate, gameType: gameType)
-      }
-
-      if completedGames.count == GameType.allCases.count {
-        perfectDays += 1
-      }
-
-      checkDate = calendar.date(byAdding: .day, value: 1, to: checkDate) ?? today
-    }
-
-    return perfectDays
-  }
-
   // MARK: - SwiftData Helper Methods
 
   private func isGameCompletedForDate(_ date: Date, gameType: GameType) -> Bool {
@@ -652,7 +653,6 @@ struct MultiGameCalendarView: View {
     return allProgress.first { $0.gameType == gameType }
   }
 }
-
 // MARK: - Supporting Types
 
 struct CalendarDay {
@@ -712,4 +712,66 @@ enum DayCompletionStatus {
 
     return MultiGameCalendarView()
         .modelContainer(container)
+}
+
+
+// MARK: - Game Filter Chip Component
+
+struct GameFilterChip: View {
+    let gameType: GameType
+    let isSelected: Bool
+    let progress: GameProgress?
+    let onTap: () -> Void
+
+    var body: some View {
+        Button(action: onTap) {
+            VStack(spacing: 8) {
+                HStack(spacing: 8) {
+                    Image(systemName: gameType.icon)
+                        .font(.title3)
+                        .foregroundStyle(gameType.color)
+
+                    Text(gameType.displayName)
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .foregroundStyle(.primary)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(gameType.color.opacity(0.1))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(
+                                isSelected ? gameType.color : gameType.color.opacity(0.3),
+                                lineWidth: isSelected ? 2 : 0
+                            )
+                    )
+            )
+        }
+        .padding(.vertical, 5)
+        .buttonStyle(.plain)
+        .scaleEffect(isSelected ? 1.0 : 0.95)
+        .animation(.spring(duration: 0.2), value: isSelected)
+        .sensoryFeedback(.impact(weight: .light), trigger: isSelected)
+    }
+}
+
+#Preview("Game Filter Chips") {
+    ScrollView(.horizontal) {
+        HStack(spacing: 12) {
+            ForEach(GameType.allCases, id: \.self) { gameType in
+                GameFilterChip(
+                    gameType: gameType,
+                    isSelected: gameType == .shikaku,
+                    progress: nil
+                ) {
+                    print("Tapped \(gameType.displayName)")
+                }
+            }
+        }
+        .padding()
+    }
 }

@@ -328,7 +328,6 @@ struct GameDayCard: View {
 
                 Spacer()
 
-                // Current streak (if available)
                 if let progress = progress, progress.currentStreak > 0 {
                     VStack(alignment: .trailing, spacing: 2) {
                         HStack(spacing: 2) {

@@ -2,7 +2,7 @@
 //  LevelManager.swift
 //  Multi-Game Puzzle App
 //
-//  Manages loading and distribution of game levels from JSON files
+//  Updated to work with simple JSON structure without gameType wrapper
 //
 
 import SwiftUI
@@ -43,13 +43,69 @@ class LevelManager {
         }
 
         do {
-            let container = try JSONDecoder().decode(GameLevelsContainer.self, from: data)
-            gameLevels[gameType] = container.levels
-            print("✅ Loaded \(container.levels.count) levels for \(gameType.displayName)")
+            // Decode the simple JSON structure
+            let levelsContainer = try JSONDecoder().decode(LevelsContainer.self, from: data)
+
+            // Convert to AnyGameLevel based on game type
+            let anyLevels = try convertToAnyGameLevels(levelsContainer.levels, for: gameType)
+            gameLevels[gameType] = anyLevels
+
+            print("✅ Loaded \(anyLevels.count) levels for \(gameType.displayName)")
         } catch {
             print("❌ Failed to decode \(gameType.displayName) levels: \(error)")
             print("🔄 Creating mock data for \(gameType.displayName)")
             gameLevels[gameType] = createMockLevels(for: gameType)
+        }
+    }
+
+    // MARK: - JSON Conversion
+
+    private func convertToAnyGameLevels(_ levels: [LevelData], for gameType: GameType) throws -> [AnyGameLevel] {
+        return try levels.map { level in
+            switch gameType {
+            case .shikaku:
+                let shikakuLevel = ShikakuLevelData(
+                    id: level.id,
+                    difficulty: level.difficulty,
+                    gridRows: level.gridRows,
+                    gridCols: level.gridCols,
+                    clues: level.clues.map { clue in
+                        ShikakuLevelData.ClueData(
+                            row: clue.row,
+                            col: clue.col,
+                            value: clue.value
+                        )
+                    }
+                )
+                return try AnyGameLevel(shikakuLevel)
+
+            case .pipe:
+                let pipeLevel = PipeLevelData(
+                    id: level.id,
+                    difficulty: level.difficulty,
+                    gridSize: max(level.gridRows, level.gridCols),
+                    pipes: [] // Convert clues to pipes if needed
+                )
+                return try AnyGameLevel(pipeLevel)
+
+            case .binario:
+                let binarioLevel = BinarioLevelData(
+                    id: level.id,
+                    difficulty: level.difficulty,
+                    gridSize: max(level.gridRows, level.gridCols),
+                    initialGrid: []
+                )
+                return try AnyGameLevel(binarioLevel)
+
+            case .wordle:
+                let wordleLevel = WordleLevelData(
+                    id: level.id,
+                    difficulty: level.difficulty,
+                    targetWord: "SWIFT", // You'll need to add this to your JSON
+                    maxAttempts: 6
+                )
+                return try AnyGameLevel(wordleLevel)
+            }
         }
     }
 
@@ -60,8 +116,6 @@ class LevelManager {
 
         for i in 1...100 {
             let difficulty = ((i - 1) / 20) + 1 // 20 levels per difficulty
-            let estimatedTime = TimeInterval(30 + (difficulty * 20) + Int.random(in: -10...30))
-
             do {
                 let levelData: any GameLevelData
 
@@ -70,7 +124,6 @@ class LevelManager {
                     levelData = ShikakuLevelData(
                         id: "shikaku_\(i)",
                         difficulty: difficulty,
-                        estimatedTime: estimatedTime,
                         gridRows: 6 + difficulty,
                         gridCols: 4 + difficulty,
                         clues: generateMockClues(gridRows: 6 + difficulty, gridCols: 4 + difficulty)
@@ -79,7 +132,6 @@ class LevelManager {
                     levelData = PipeLevelData(
                         id: "pipe_\(i)",
                         difficulty: difficulty,
-                        estimatedTime: estimatedTime,
                         gridSize: 4 + difficulty,
                         pipes: []
                     )
@@ -87,7 +139,6 @@ class LevelManager {
                     levelData = BinarioLevelData(
                         id: "binario_\(i)",
                         difficulty: difficulty,
-                        estimatedTime: estimatedTime,
                         gridSize: 6 + (difficulty * 2),
                         initialGrid: []
                     )
@@ -95,7 +146,6 @@ class LevelManager {
                     levelData = WordleLevelData(
                         id: "wordle_\(i)",
                         difficulty: difficulty,
-                        estimatedTime: estimatedTime,
                         targetWord: "SWIFT",
                         maxAttempts: 6
                     )
@@ -138,7 +188,7 @@ class LevelManager {
 
         // Calculate deterministic index based on date
         let dayOffset = calendar.dateComponents([.day], from: referenceDate, to: date).day ?? 0
-        let adjustedOffset = dayOffset + 100 // Add offset to avoid negative numbers
+        let adjustedOffset = dayOffset + 100
         let levelIndex = ((adjustedOffset % levels.count) + levels.count) % levels.count
 
         return levels[levelIndex]
@@ -180,27 +230,33 @@ class LevelManager {
         }
         return distribution
     }
-
-    func getAverageEstimatedTime(for gameType: GameType, difficulty: Int? = nil) -> TimeInterval {
-        guard let levels = gameLevels[gameType] else { return 0 }
-
-        let filteredLevels = difficulty != nil
-            ? levels.filter { $0.difficulty == difficulty }
-            : levels
-
-        guard !filteredLevels.isEmpty else { return 0 }
-
-        let totalTime = filteredLevels.reduce(0) { $0 + $1.estimatedTime }
-        return totalTime / Double(filteredLevels.count)
-    }
 }
 
-// MARK: - Game Level Data Structures
+// MARK: - JSON Data Structures for Parsing
+
+struct LevelsContainer: Codable {
+    let levels: [LevelData]
+}
+
+struct LevelData: Codable {
+    let id: String
+    let gridRows: Int
+    let gridCols: Int
+    let difficulty: Int
+    let clues: [ClueData]
+}
+
+struct ClueData: Codable {
+    let row: Int
+    let col: Int
+    let value: Int
+}
+
+// MARK: - Game Level Data Structures (Keep your existing ones, just remove estimatedTime)
 
 struct ShikakuLevelData: GameLevelData {
     let id: String
     let difficulty: Int
-    let estimatedTime: TimeInterval
     let gridRows: Int
     let gridCols: Int
     let clues: [ClueData]
@@ -215,7 +271,6 @@ struct ShikakuLevelData: GameLevelData {
 struct PipeLevelData: GameLevelData {
     let id: String
     let difficulty: Int
-    let estimatedTime: TimeInterval
     let gridSize: Int
     let pipes: [PipeData]
 
@@ -233,14 +288,12 @@ struct PipeLevelData: GameLevelData {
 struct BinarioLevelData: GameLevelData {
     let id: String
     let difficulty: Int
-    let estimatedTime: TimeInterval
     let gridSize: Int
-    let initialGrid: [[Int?]] // nil = empty, 0 = zero, 1 = one
+    let initialGrid: [[Int?]]
 
-    init(id: String, difficulty: Int, estimatedTime: TimeInterval, gridSize: Int, initialGrid: [[Int?]]) {
+    init(id: String, difficulty: Int, gridSize: Int, initialGrid: [[Int?]]) {
         self.id = id
         self.difficulty = difficulty
-        self.estimatedTime = estimatedTime
         self.gridSize = gridSize
         self.initialGrid = initialGrid.isEmpty ? Array(repeating: Array(repeating: nil, count: gridSize), count: gridSize) : initialGrid
     }
@@ -249,7 +302,6 @@ struct BinarioLevelData: GameLevelData {
 struct WordleLevelData: GameLevelData {
     let id: String
     let difficulty: Int
-    let estimatedTime: TimeInterval
     let targetWord: String
     let maxAttempts: Int
 }

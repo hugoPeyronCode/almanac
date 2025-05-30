@@ -107,7 +107,6 @@ struct GameHeaderView: View {
 
             Spacer()
 
-            // Timer Display - 🔥 MAINTENANT RÉACTIF
             VStack(alignment: .trailing, spacing: 2) {
                 Text(Duration.seconds(gameTimer.displayTime), format: .time(pattern: .minuteSecond))
                     .font(.headline)
@@ -115,10 +114,6 @@ struct GameHeaderView: View {
                     .contentTransition(.numericText())
                     .monospacedDigit()
                     .foregroundStyle(gameTimer.isPaused ? .secondary : .primary)
-
-                Text(formatEstimatedTime(session.level.estimatedTime))
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
             }
         }
         .confirmationDialog("Exit Game", isPresented: showExitConfirmation) {

@@ -227,35 +227,6 @@ class GameSession {
         return String(format: "%d:%02d.%02d", minutes, seconds, centiseconds)
     }
 
-    // MARK: - Session Analytics
-
-    var isOverEstimatedTime: Bool {
-        actualPlayTime > level.estimatedTime
-    }
-
-    var performanceRatio: Double {
-        guard level.estimatedTime > 0 else { return 1.0 }
-        return actualPlayTime / level.estimatedTime
-    }
-
-    var performanceGrade: String {
-        let ratio = performanceRatio
-        switch ratio {
-        case 0...0.6:
-            return "S" // Exceptional
-        case 0.6...0.8:
-            return "A" // Excellent
-        case 0.8...1.0:
-            return "B" // Good
-        case 1.0...1.3:
-            return "C" // Average
-        case 1.3...2.0:
-            return "D" // Below Average
-        default:
-            return "F" // Needs Practice
-        }
-    }
-
     // MARK: - Session Validation
 
     func validateSession() -> Bool {
@@ -281,7 +252,6 @@ class GameSession {
         - Actual Play Time: \(formattedPlayTime)
         - Total Elapsed: \(String(format: "%.1f", totalElapsedTime))s
         - Paused Duration: \(String(format: "%.1f", pausedDuration))s
-        - Performance Grade: \(performanceGrade)
         """
     }
 }

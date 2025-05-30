@@ -279,10 +279,9 @@ struct GamePlayView: View {
                     .font(.headline)
                     .foregroundStyle(.secondary)
 
-                // Performance indicator
-                let performance = getPerformanceText()
-                if !performance.isEmpty {
-                    Text(performance)
+                let congratulationText = getCongratulationText()
+                if !congratulationText.isEmpty {
+                    Text(congratulationText)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .padding(.top, 4)
@@ -434,19 +433,13 @@ struct GamePlayView: View {
         .ignoresSafeArea()
     }
 
-    private func getPerformanceText() -> String {
-        let actualTime = session.actualPlayTime
-        let estimatedTime = session.level.estimatedTime
+    private func getCongratulationText() -> String {
 
-        if actualTime < estimatedTime * 0.8 {
+      // Make this random
             return "Excellent performance! 🏆"
-        } else if actualTime < estimatedTime {
             return "Great job! 👏"
-        } else if actualTime < estimatedTime * 1.3 {
             return "Well done! 👍"
-        } else {
             return "Keep practicing! 💪"
-        }
     }
 
     private func togglePause() {

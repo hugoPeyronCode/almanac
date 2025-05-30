@@ -13,9 +13,8 @@ struct ShikakuGameView: View {
 
   @State private var session: GameSession
   @State private var showExitConfirmation = false
-  @State private var gameTimer = GameTimer() // 🔥 NOUVEAU : Timer observable
+  @State private var gameTimer = GameTimer()
 
-  // Visual state
   @State private var dragStart: GridPosition?
   @State private var dragEnd: GridPosition?
   @State private var isDragging = false
@@ -34,7 +33,7 @@ struct ShikakuGameView: View {
           GameHeaderView(
             session: session,
             showExitConfirmation: $showExitConfirmation,
-            gameTimer: gameTimer, // 🔥 PASSER le timer
+            gameTimer: gameTimer,
             subtitle: contextSubtitle
           ) {
             gameTimer.stopTimer()
@@ -71,22 +70,24 @@ struct ShikakuGameView: View {
       Text("Are you sure you want to exit? Progress will be lost.")
     }
     .onAppear {
-      session.game.generateReferenceLevel()
+//      session.game.generateReferenceLevel()
       gameTimer.displayTime = session.actualPlayTime
       gameTimer.startTimer()
     }
     .onDisappear {
-        gameTimer.stopTimer()
+      gameTimer.stopTimer()
 
-        if !session.game.isGameComplete {
-            session.pause()
-            gameTimer.pause()
-        }
+      if !session.game.isGameComplete {
+        session.pause()
+        gameTimer.pause()
+      }
+
+      // Clean up the game instance to prevent memory leaks
+      session.cleanupGameInstance()
     }
 
+
   }
-
-
 
   // MARK: - Views
   private func gameGrid(in geometry: GeometryProxy) -> some View {
@@ -171,13 +172,14 @@ struct ShikakuGameView: View {
 
   private var controlsView: some View {
     HStack {
+      Spacer()
       Button {
         withAnimation(.spring(duration: 0.3)) {
           session.game.clearBoard()
         }
       } label: {
         Text("Clear")
-          .foregroundStyle(.secondary)
+          .foregroundStyle(Color.secondary)
           .frame(width: 80, height: 44)
           .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
       }
@@ -185,38 +187,27 @@ struct ShikakuGameView: View {
 
       Spacer()
 
-      // Hint button for practice mode
-      if case .practice = session.context {
-        Button {
-          // TODO: Implement hint system
-        } label: {
-          Image(systemName: "lightbulb")
-            .foregroundStyle(.secondary)
-            .frame(width: 44, height: 44)
-            .background(.ultraThinMaterial, in: Circle())
-        }
-      }
     }
   }
 
 
   // MARK: - TIMER MANAGEMENT
   private func togglePause() {
-        withAnimation(.easeInOut(duration: 0.3)) {
-            if gameTimer.isPaused {
-                session.resume()
-                gameTimer.resume()
-            } else {
-                session.pause()
-                gameTimer.pause()
-            }
-        }
+    withAnimation(.easeInOut(duration: 0.3)) {
+      if gameTimer.isPaused {
+        session.resume()
+        gameTimer.resume()
+      } else {
+        session.pause()
+        gameTimer.pause()
+      }
     }
+  }
 
-    private func handleGameCompletion() {
-        gameTimer.stopTimer()
-        session.complete()
-    }
+  private func handleGameCompletion() {
+    gameTimer.stopTimer()
+    session.complete()
+  }
 
 
   // MARK: - Helper Methods
@@ -429,27 +420,47 @@ class ShikakuGame {
     // Prepare haptics for better performance
     lightImpact.prepare()
     notificationFeedback.prepare()
-
-    generateReferenceLevel()
   }
 
-  func generateReferenceLevel() {
-    // Use your exact JSON reference
-    gridSize = (rows: 5, cols: 5)
-    numberClues = [
-      NumberClue(position: GridPosition(row: 0, col: 0), value: 2),
-      NumberClue(position: GridPosition(row: 2, col: 2), value: 6),
-      NumberClue(position: GridPosition(row: 3, col: 4), value: 4),
-      NumberClue(position: GridPosition(row: 4, col: 0), value: 4),
-      NumberClue(position: GridPosition(row: 3, col: 1), value: 3),
-      NumberClue(position: GridPosition(row: 3, col: 2), value: 4),
-      NumberClue(position: GridPosition(row: 4, col: 1), value: 1),
-      NumberClue(position: GridPosition(row: 4, col: 4), value: 1)
-    ]
-    rectangles = []
-    colorIndex = 0
-    validateGame()
+  func loadLevel(_ levelData: ShikakuLevelData) {
+      gridSize = (rows: levelData.gridRows, cols: levelData.gridCols)
+
+      // Convert level clues to NumberClue objects
+      numberClues = levelData.clues.map { clueData in
+          NumberClue(
+              position: GridPosition(row: clueData.row, col: clueData.col),
+              value: clueData.value
+          )
+      }
+
+      rectangles = []
+      colorIndex = 0
+      validateGame()
+
+      print("✅ Loaded Shikaku level: \(levelData.gridRows)x\(levelData.gridCols) with \(levelData.clues.count) clues")
   }
+
+  func loadDefaultLevel() {
+      // Fallback level if JSON loading fails
+      gridSize = (rows: 5, cols: 5)
+      numberClues = [
+          NumberClue(position: GridPosition(row: 0, col: 0), value: 3),
+          NumberClue(position: GridPosition(row: 0, col: 3), value: 4),
+          NumberClue(position: GridPosition(row: 1, col: 0), value: 2),
+          NumberClue(position: GridPosition(row: 3, col: 1), value: 4),
+          NumberClue(position: GridPosition(row: 3, col: 2), value: 3),
+          NumberClue(position: GridPosition(row: 2, col: 3), value: 2),
+          NumberClue(position: GridPosition(row: 3, col: 4), value: 3),
+          NumberClue(position: GridPosition(row: 4, col: 0), value: 2),
+          NumberClue(position: GridPosition(row: 4, col: 2), value: 2)
+      ]
+      rectangles = []
+      colorIndex = 0
+      validateGame()
+
+      print("⚠️ Loaded default Shikaku level")
+  }
+
 
   // NEW: Function to validate a preview rectangle during dragging
   func validatePreviewRectangle(from start: GridPosition, to end: GridPosition) -> (isValid: Bool, color: Color) {
@@ -619,14 +630,48 @@ extension GridPosition: Equatable {
 // MARK: - GameSession Extension for Shikaku
 
 extension GameSession {
-  private static var sharedShikakuGame = ShikakuGame()
+    private static var gameInstances: [String: ShikakuGame] = [:]
 
-  var game: ShikakuGame {
-    // Return the shared game instance
-    return Self.sharedShikakuGame
-  }
+    var game: ShikakuGame {
+        // Use session ID as key to maintain unique game instances
+        let sessionKey = "\(id.uuidString)"
+
+        // Return existing game instance if it exists
+        if let existingGame = Self.gameInstances[sessionKey] {
+            return existingGame
+        }
+
+        // Create new game instance for this session
+        let shikakuGame = ShikakuGame()
+
+        // Load the actual level data if it's a Shikaku level
+        if gameType == .shikaku {
+            do {
+                let levelData = try level.decode(as: ShikakuLevelData.self)
+                shikakuGame.loadLevel(levelData)
+                print("✅ Loaded Shikaku level: \(levelData.id)")
+            } catch {
+                print("❌ Failed to decode Shikaku level data: \(error)")
+                // Fallback: create a default level
+                shikakuGame.loadDefaultLevel()
+            }
+        } else {
+            // For non-Shikaku games, load default
+            shikakuGame.loadDefaultLevel()
+        }
+
+        // Store the game instance
+        Self.gameInstances[sessionKey] = shikakuGame
+
+        return shikakuGame
+    }
+
+    // Clean up game instance when session ends
+    func cleanupGameInstance() {
+        let sessionKey = "\(id.uuidString)"
+        Self.gameInstances.removeValue(forKey: sessionKey)
+    }
 }
-
 #Preview("Shikaku - Daily Challenge") {
   let mockLevel = try! AnyGameLevel(MockShikakuLevel(
     id: "shikaku_daily_1",

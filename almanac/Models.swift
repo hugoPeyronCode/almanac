@@ -37,8 +37,8 @@ enum GameType: String, CaseIterable, Codable {
 
     var color: Color {
         switch self {
-        case .shikaku: return .blue
-        case .pipe: return .green
+        case .shikaku: return .brown
+        case .pipe: return .cyan
         case .binario: return .orange
         case .wordle: return .purple
         }

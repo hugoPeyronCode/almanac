@@ -39,6 +39,7 @@ struct CalendarDayView: View {
     Button(action: onTap) {
       if isCompact {
         compactDayView
+          .padding(.vertical)
       } else {
         fullDayView
       }
@@ -56,16 +57,15 @@ struct CalendarDayView: View {
           .frame(width: 36, height: 36)
           .overlay(
             Circle()
-              .stroke(isSelected ? Color.blue : Color.clear, lineWidth: 2)
+              .stroke(isSelected ? Color.indigo : Color.clear, lineWidth: 2)
           )
           .overlay(progressRing)
-          .overlay(completionIndicator)
 
         if dayState == .allCompleted {
           Image(systemName: "checkmark")
             .font(.caption)
             .fontWeight(.bold)
-            .foregroundStyle(.white)
+            .foregroundStyle(.background)
         } else if day.isCurrentMonth {
           Text("\(day.dayNumber)")
             .font(.system(size: 16, weight: isSelected ? .bold : .medium))
@@ -82,18 +82,17 @@ struct CalendarDayView: View {
   private var fullDayView: some View {
     VStack(spacing: 4) {
       ZStack {
-        RoundedRectangle(cornerRadius: 12)
+        Circle()
           .fill(backgroundColor)
           .frame(width: 44, height: 44)
           .overlay(progressRing)
-          .overlay(completionIndicator)
           .overlay(selectionHighlight)
 
         if dayState == .allCompleted {
           Image(systemName: "checkmark")
             .font(.title3)
             .fontWeight(.bold)
-            .foregroundStyle(.white)
+            .foregroundStyle(.background)
         } else if day.isCurrentMonth {
           Text("\(day.dayNumber)")
             .font(.system(size: 16, weight: dayState == .today ? .bold : .medium))
@@ -114,11 +113,11 @@ struct CalendarDayView: View {
     case .hasLevels:
       return Color.secondary.opacity(0.1)
     case .partiallyCompleted:
-      return Color.orange.opacity(0.6)
+      return Color.primary.opacity(0.2)
     case .allCompleted:
-      return Color.green
+      return Color.primary
     case .today:
-      return Color.blue.opacity(0.6)
+      return Color.primary.opacity(0.4)
     }
   }
 
@@ -129,11 +128,11 @@ struct CalendarDayView: View {
     case .hasLevels:
       return .primary
     case .partiallyCompleted:
-      return .white
+      return .primary
     case .allCompleted:
-      return .white
+      return .primary
     case .today:
-      return .white
+      return .primary
     }
   }
 
@@ -149,7 +148,7 @@ struct CalendarDayView: View {
               .trim(from: 0, to: progress)
               .stroke(
                 LinearGradient(
-                  colors: [.orange, .yellow],
+                  colors: [.primary, .gray],
                   startPoint: .topLeading,
                   endPoint: .bottomTrailing
                 ),
@@ -176,7 +175,7 @@ struct CalendarDayView: View {
               .padding(.vertical, 2)
               .background(
                 Capsule()
-                  .fill(.black.opacity(0.4))
+                  .fill(.primary.opacity(0.4))
               )
           }
           Spacer()
@@ -189,12 +188,12 @@ struct CalendarDayView: View {
   private var selectionHighlight: some View {
     Group {
       if isSelected && !isCompact {
-        RoundedRectangle(cornerRadius: 12)
+        Circle()
           .stroke(
             LinearGradient(
-              colors: [.blue, .cyan],
-              startPoint: .topLeading,
-              endPoint: .bottomTrailing
+              colors: [.indigo],
+              startPoint: .top,
+              endPoint: .bottom
             ),
             lineWidth: 3
           )
@@ -221,211 +220,182 @@ struct CalendarDayView: View {
 // MARK: - Game Day Card
 
 struct GameDayCard: View {
-  let gameType: GameType
-  let date: Date
-  let level: AnyGameLevel?
-  let isCompleted: Bool
-  let progress: GameProgress?
-  let onTap: () -> Void
-  let onMarkComplete: (() -> Void)?
+    let gameType: GameType
+    let date: Date
+    let level: AnyGameLevel?
+    let isCompleted: Bool
+    let progress: GameProgress?
+    let onTap: () -> Void
+    let onMarkComplete: (() -> Void)? = nil // Always nil now
 
-  var body: some View {
-    VStack(spacing: 0) {
-      // Top section with game info
-      topSection
-        .padding(.top, 16)
-        .padding(.horizontal, 16)
+    var body: some View {
+        VStack(spacing: 0) {
+            // Top section with game info
+            topSection
+                .padding(.top, 16)
+                .padding(.horizontal, 16)
 
-      Spacer()
-
-      // Bottom section with level info and controls
-      bottomSection
-        .padding(16)
-        .background(.ultraThinMaterial)
-    }
-    .containerRelativeFrame([.horizontal]) { length, _ in
-      length * 0.45
-    }
-    .frame(height: 160) // Increased height for test button
-    .background(
-      RoundedRectangle(cornerRadius: 16)
-        .fill(.thinMaterial)
-        .shadow(color: .black.opacity(0.05), radius: 8, y: 4)
-    )
-    .overlay(
-      RoundedRectangle(cornerRadius: 16)
-        .stroke(
-          isCompleted ? gameType.color : gameType.color.opacity(0.3),
-          lineWidth: isCompleted ? 2 : 1
-        )
-    )
-    .overlay(
-      // Completion checkmark overlay
-      Group {
-        if isCompleted {
-          VStack {
-            HStack {
-              Spacer()
-              Image(systemName: "checkmark.circle.fill")
-                .font(.title2)
-                .foregroundStyle(.white)
-                .background(
-                  Circle()
-                    .fill(gameType.color)
-                    .frame(width: 28, height: 28)
-                )
-            }
-            .padding(.top, 8)
-            .padding(.trailing, 8)
             Spacer()
-          }
+
+            // Bottom section with level info and controls
+            bottomSection
+                .padding(16)
+                .background(gameType.color.opacity(0.1))
+                .clipShape(RoundedRectangle(cornerRadius: 16))
         }
-      }
-    )
-    .sensoryFeedback(.impact(weight: .medium), trigger: false)
-  }
-
-  private var topSection: some View {
-    VStack(spacing: 12) {
-      HStack {
-        Image(systemName: gameType.icon)
-          .font(.title2)
-          .foregroundStyle(gameType.color)
-
-        Spacer()
-      }
-
-      Text(gameType.displayName)
-        .font(.headline)
-        .fontWeight(.medium)
-        .foregroundStyle(.primary)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .containerRelativeFrame([.horizontal]) { length, _ in
+            length * 0.45
+        }
+        .frame(height: 160)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(.thinMaterial)
+                .shadow(color: .primary.opacity(0.05), radius: 8, y: 4)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(
+                  isCompleted ? Color.primary.opacity(0.3): Color.primary,
+                    lineWidth: isCompleted ? 1 : 2
+                )
+        )
+        .overlay(
+            Group {
+                if isCompleted {
+                    VStack {
+                        HStack {
+                            Spacer()
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.title2)
+                                .foregroundStyle(Color.primary)
+                        }
+                        .padding(.top, 12)
+                        .padding(.trailing, 12)
+                        Spacer()
+                    }
+                }
+            }
+        )
+        .sensoryFeedback(.impact(weight: .medium), trigger: false)
     }
-  }
 
-  private var bottomSection: some View {
-    VStack(spacing: 12) {
-      // Level info
-      HStack {
-        if let level = level {
-          VStack(alignment: .leading, spacing: 2) {
-            Text("Difficulty \(level.difficulty)/5")
-              .font(.caption)
-              .foregroundStyle(.secondary)
+    private var topSection: some View {
+        VStack(spacing: 12) {
+            HStack {
+                Image(systemName: gameType.icon)
+                    .font(.title2)
+                    .foregroundStyle(gameType.color)
 
-            Text(formatTime(level.estimatedTime))
-              .font(.caption2)
-              .foregroundStyle(.tertiary)
-          }
+                Text(gameType.displayName)
+                    .font(.headline)
+                    .fontWeight(.medium)
+                    .foregroundStyle(.primary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                Spacer()
+            }
+        }
+    }
+
+    private var bottomSection: some View {
+        VStack(spacing: 12) {
+            // Level info with stars and player time
+            HStack {
+                if let level = level {
+                    VStack(alignment: .leading, spacing: 4) {
+                        DifficultyStars(difficulty: level.difficulty, size: 10, spacing: 1)
+
+                        // Player's best time (if available)
+                        if let progress = progress, let bestTime = progress.bestTime {
+                            Text("\(formatTime(bestTime))")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        } else {
+                            Text("No time yet")
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
+                } else {
+                    VStack(alignment: .leading, spacing: 4) {
+                        DifficultyStars(difficulty: 1, size: 10, spacing: 1)
+
+                        Text("No level available")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                Spacer()
+
+                // Current streak (if available)
+                if let progress = progress, progress.currentStreak > 0 {
+                    VStack(alignment: .trailing, spacing: 2) {
+                        HStack(spacing: 2) {
+                            Image(systemName: "flame.fill")
+                                .font(.system(size: 10))
+                                .foregroundStyle(.orange)
+                            Text("\(progress.currentStreak)")
+                                .font(.caption)
+                                .foregroundStyle(.orange)
+                                .fontWeight(.medium)
+                        }
+
+                        Text("streak")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+            }
+
+            HStack {
+                if isCompleted {
+                    HStack(spacing: 6) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.caption)
+                            .foregroundStyle(Color.primary)
+                        Text("Completed")
+                            .font(.caption)
+                            .fontWeight(.medium)
+                            .foregroundStyle(Color.primary)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                          .fill(gameType.color.opacity(0.1))
+                    )
+                } else {
+                    // Single Play button
+                    Button(action: onTap) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "play.fill")
+                                .font(.caption)
+                            Text("Play")
+                                .font(.caption)
+                                .fontWeight(.medium)
+                        }
+                        .foregroundStyle(.background)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                        .background(Color.primary, in: RoundedRectangle(cornerRadius: 8))
+                    }
+                    .sensoryFeedback(.impact(weight: .medium), trigger: false)
+                }
+            }
+        }
+    }
+
+    private func formatTime(_ seconds: TimeInterval) -> String {
+        let minutes = Int(seconds) / 60
+        let remainingSeconds = Int(seconds) % 60
+
+        if minutes > 0 {
+            return "\(minutes)m \(remainingSeconds)s"
         } else {
-          Text("No level available")
-            .font(.caption)
-            .foregroundStyle(.secondary)
+            return "\(remainingSeconds)s"
         }
-
-        Spacer()
-      }
-
-      // Button controls
-      HStack(spacing: 8) {
-        if isCompleted {
-          HStack(spacing: 6) {
-            Image(systemName: "checkmark.circle.fill")
-              .font(.caption)
-              .foregroundStyle(.green)
-            Text("Completed")
-              .font(.caption)
-              .fontWeight(.medium)
-              .foregroundStyle(.green)
-          }
-          .frame(maxWidth: .infinity)
-          .padding(.vertical, 8)
-          .background(
-            RoundedRectangle(cornerRadius: 8)
-              .fill(.green.opacity(0.1))
-              .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                  .stroke(.green.opacity(0.3), lineWidth: 1)
-              )
-          )
-        } else {
-          // Play button
-          Button(action: onTap) {
-            HStack(spacing: 4) {
-              Image(systemName: "play.fill")
-                .font(.caption)
-              Text("Play")
-                .font(.caption)
-                .fontWeight(.medium)
-            }
-            .foregroundStyle(.white)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 8)
-            .background(gameType.color, in: RoundedRectangle(cornerRadius: 8))
-          }
-          .sensoryFeedback(.impact(weight: .medium), trigger: false)
-
-          // Test completion button
-          if let onMarkComplete = onMarkComplete {
-            Button(action: onMarkComplete) {
-              HStack(spacing: 4) {
-                Image(systemName: "checkmark")
-                  .font(.caption)
-                Text("Test")
-                  .font(.caption)
-                  .fontWeight(.medium)
-              }
-              .foregroundStyle(gameType.color)
-              .frame(maxWidth: .infinity)
-              .padding(.vertical, 8)
-              .background(
-                RoundedRectangle(cornerRadius: 8)
-                  .fill(gameType.color.opacity(0.1))
-                  .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                      .stroke(gameType.color.opacity(0.5), lineWidth: 1)
-                  )
-              )
-            }
-            .sensoryFeedback(.success, trigger: false)
-          }
-        }
-      }
-
-      // Progress indicator
-      if let progress = progress, progress.totalCompleted > 0 {
-        HStack {
-          Text("\(progress.totalCompleted) completed")
-            .font(.caption2)
-            .foregroundStyle(.tertiary)
-
-          Spacer()
-
-          if progress.currentStreak > 0 {
-            HStack(spacing: 2) {
-              Image(systemName: "flame.fill")
-                .font(.system(size: 8))
-                .foregroundStyle(.orange)
-              Text("\(progress.currentStreak)")
-                .font(.caption2)
-                .foregroundStyle(.orange)
-            }
-          }
-        }
-      }
     }
-  }
-
-  private func formatTime(_ seconds: TimeInterval) -> String {
-    let minutes = Int(seconds) / 60
-    let remainingSeconds = Int(seconds) % 60
-
-    if minutes > 0 {
-      return "\(minutes)m \(remainingSeconds)s"
-    } else {
-      return "\(remainingSeconds)s"
-    }
-  }
 }
 
 // MARK: - Stat Card
@@ -440,7 +410,7 @@ struct StatCard: View {
     VStack(spacing: 8) {
       Image(systemName: icon)
         .font(.title3)
-        .foregroundStyle(color)
+        .foregroundStyle(.primary)
 
       Text("\(value)")
         .font(.title3)
@@ -462,6 +432,130 @@ struct StatCard: View {
   }
 }
 
-#Preview {
+#Preview("stats card") {
   StatCard(value: 150, label: "streak", icon: "fire.fill", color: .red)
+}
+
+#Preview("GameDayCard - All Game Types") {
+    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 16), count: 2), spacing: 16) {
+        ForEach(GameType.allCases, id: \.self) { gameType in
+            let mockLevel = createMockLevel(for: gameType)
+            let mockProgress = createMockProgress(for: gameType)
+
+            GameDayCard(
+                gameType: gameType,
+                date: Date(),
+                level: mockLevel,
+                isCompleted: Bool.random(),
+                progress: mockProgress,
+                onTap: {
+                    print("\(gameType.displayName) tapped")
+                }
+            )
+        }
+    }
+    .padding()
+}
+
+private func createMockProgress(for gameType: GameType) -> GameProgress? {
+    // 70% chance of having progress
+    guard Bool.random() && Bool.random() else { return nil }
+
+    let progress = GameProgress(gameType: gameType)
+    progress.totalCompleted = Int.random(in: 1...30)
+    progress.currentStreak = Int.random(in: 0...12)
+    progress.maxStreak = max(progress.currentStreak, Int.random(in: 5...15))
+    progress.bestTime = Double.random(in: 45...300)
+    progress.averageTime = Double.random(in: 80...250)
+
+    return progress
+}
+
+
+private func createMockLevel(for gameType: GameType) -> AnyGameLevel {
+    do {
+        let difficulty = Int.random(in: 1...5)
+        let estimatedTime = TimeInterval(difficulty * 45 + Int.random(in: 30...90))
+
+        switch gameType {
+        case .shikaku:
+            return try AnyGameLevel(MockShikakuLevel(
+                id: "\(gameType.rawValue)_mock",
+                difficulty: difficulty,
+                estimatedTime: estimatedTime,
+                gridRows: 4 + difficulty,
+                gridCols: 4 + difficulty,
+                clues: []
+            ))
+        case .pipe:
+            return try AnyGameLevel(MockPipeLevel(
+                id: "\(gameType.rawValue)_mock",
+                difficulty: difficulty,
+                estimatedTime: estimatedTime,
+                gridSize: 3 + difficulty,
+                pipes: []
+            ))
+        case .binario:
+            return try AnyGameLevel(MockBinarioLevel(
+                id: "\(gameType.rawValue)_mock",
+                difficulty: difficulty,
+                estimatedTime: estimatedTime,
+                gridSize: 4 + (difficulty * 2),
+                initialGrid: []
+            ))
+        case .wordle:
+            return try AnyGameLevel(MockWordleLevel(
+                id: "\(gameType.rawValue)_mock",
+                difficulty: difficulty,
+                estimatedTime: estimatedTime,
+                targetWord: ["SWIFT", "GAMES", "BRAIN", "TOUGH", "MAGIC"][difficulty - 1],
+                maxAttempts: 6
+            ))
+        }
+    } catch {
+        fatalError("Failed to create mock level: \(error)")
+    }
+}
+
+
+// MARK: - Star Difficulty Component
+
+struct DifficultyStars: View {
+    let difficulty: Int
+    let maxStars: Int = 5
+    let size: CGFloat
+    let spacing: CGFloat
+
+    init(difficulty: Int, size: CGFloat = 12, spacing: CGFloat = 2) {
+        self.difficulty = max(1, min(5, difficulty)) // Clamp between 1-5
+        self.size = size
+        self.spacing = spacing
+    }
+
+    var body: some View {
+        HStack(spacing: spacing) {
+            ForEach(1...maxStars, id: \.self) { star in
+                Image(systemName: star <= difficulty ? "star.fill" : "star")
+                    .font(.system(size: size))
+                    .foregroundStyle(star <= difficulty ? starColor(for: difficulty) : .secondary.opacity(0.3))
+            }
+        }
+    }
+
+    private func starColor(for difficulty: Int) -> Color {
+        switch difficulty {
+        case 1:
+            return .green
+        case 2:
+            return .mint
+        case 3:
+            return .yellow
+        case 4:
+            return .orange
+        case 5:
+            return .red
+        default:
+            return .gray
+        }
+    }
 }

@@ -126,12 +126,17 @@ class GameSession {
     let gameType: GameType
     let level: AnyGameLevel
     let context: GameContext
-    var startTime = Date()
-    var endTime: Date?
-    var isCompleted = false
-    var isPaused = false
-    var pausedDuration: TimeInterval = 0
+
+    // Time tracking
+    private(set) var startTime = Date()
+    private(set) var endTime: Date?
+    private(set) var isCompleted = false
+    private(set) var isPaused = false
+    private(set) var pausedDuration: TimeInterval = 0
     private var pauseStartTime: Date?
+
+    // Session state
+    private var lastActiveTime = Date()
 
     enum GameContext {
         case daily(Date)
@@ -143,32 +148,68 @@ class GameSession {
         self.gameType = gameType
         self.level = level
         self.context = context
+        self.startTime = Date()
+        self.lastActiveTime = startTime
     }
 
     func complete() {
         guard !isCompleted else { return }
+
         isCompleted = true
         endTime = Date()
+
+        // If we were paused when completing, account for the current pause
+        if isPaused, let pauseStart = pauseStartTime {
+            pausedDuration += Date().timeIntervalSince(pauseStart)
+            pauseStartTime = nil
+            isPaused = false
+        }
+
+        print("🎯 Game completed: \(gameType.displayName) in \(formattedPlayTime)")
     }
 
     func pause() {
-        guard !isPaused else { return }
+        guard !isPaused && !isCompleted else { return }
+
         isPaused = true
         pauseStartTime = Date()
+        lastActiveTime = Date()
+
+        print("⏸️ Game paused: \(gameType.displayName)")
     }
 
     func resume() {
         guard isPaused, let pauseStart = pauseStartTime else { return }
+
         isPaused = false
         pausedDuration += Date().timeIntervalSince(pauseStart)
         pauseStartTime = nil
+        lastActiveTime = Date()
+
+        print("▶️ Game resumed: \(gameType.displayName)")
     }
 
+    // MARK: - Time Calculations
+
+    /// Total time elapsed since game start, excluding paused time
     var actualPlayTime: TimeInterval {
-        let end = endTime ?? Date()
-        let totalTime = end.timeIntervalSince(startTime)
-        let currentPauseDuration = isPaused ? Date().timeIntervalSince(pauseStartTime ?? Date()) : 0
-        return totalTime - pausedDuration - currentPauseDuration
+        let endTimeToUse = endTime ?? Date()
+        let totalElapsed = endTimeToUse.timeIntervalSince(startTime)
+
+        // Account for current pause if in progress
+        let currentPauseDuration = isPaused
+            ? Date().timeIntervalSince(pauseStartTime ?? Date())
+            : 0
+
+        let totalPausedTime = pausedDuration + currentPauseDuration
+
+        return max(0, totalElapsed - totalPausedTime)
+    }
+
+    /// Raw time elapsed since game start, including paused time
+    var totalElapsedTime: TimeInterval {
+        let endTimeToUse = endTime ?? Date()
+        return endTimeToUse.timeIntervalSince(startTime)
     }
 
     var formattedPlayTime: String {
@@ -176,6 +217,101 @@ class GameSession {
         let minutes = Int(time) / 60
         let seconds = Int(time) % 60
         return String(format: "%d:%02d", minutes, seconds)
+    }
+
+    var detailedTimeString: String {
+        let time = actualPlayTime
+        let minutes = Int(time) / 60
+        let seconds = Int(time) % 60
+        let centiseconds = Int((time.truncatingRemainder(dividingBy: 1)) * 100)
+        return String(format: "%d:%02d.%02d", minutes, seconds, centiseconds)
+    }
+
+    // MARK: - Session Analytics
+
+    var isOverEstimatedTime: Bool {
+        actualPlayTime > level.estimatedTime
+    }
+
+    var performanceRatio: Double {
+        guard level.estimatedTime > 0 else { return 1.0 }
+        return actualPlayTime / level.estimatedTime
+    }
+
+    var performanceGrade: String {
+        let ratio = performanceRatio
+        switch ratio {
+        case 0...0.6:
+            return "S" // Exceptional
+        case 0.6...0.8:
+            return "A" // Excellent
+        case 0.8...1.0:
+            return "B" // Good
+        case 1.0...1.3:
+            return "C" // Average
+        case 1.3...2.0:
+            return "D" // Below Average
+        default:
+            return "F" // Needs Practice
+        }
+    }
+
+    // MARK: - Session Validation
+
+    func validateSession() -> Bool {
+        // Basic validation checks
+        guard startTime <= Date() else { return false }
+        guard actualPlayTime >= 0 else { return false }
+
+        if let endTime = endTime {
+            guard endTime >= startTime else { return false }
+        }
+
+        return true
+    }
+
+    // MARK: - Debug Information
+
+    var debugTimeInfo: String {
+        return """
+        Session Debug Info:
+        - Game: \(gameType.displayName)
+        - Started: \(startTime)
+        - Current Status: \(isCompleted ? "Completed" : isPaused ? "Paused" : "Active")
+        - Actual Play Time: \(formattedPlayTime)
+        - Total Elapsed: \(String(format: "%.1f", totalElapsedTime))s
+        - Paused Duration: \(String(format: "%.1f", pausedDuration))s
+        - Performance Grade: \(performanceGrade)
+        """
+    }
+}
+
+// MARK: - Context Extensions
+
+extension GameSession.GameContext {
+    var date: Date? {
+        switch self {
+        case .daily(let date):
+            return date
+        default:
+            return nil
+        }
+    }
+
+    var displayName: String {
+        switch self {
+        case .daily:
+            return "Daily Challenge"
+        case .practice:
+            return "Practice Mode"
+        case .random:
+            return "Random Level"
+        }
+    }
+
+    var isDaily: Bool {
+        if case .daily = self { return true }
+        return false
     }
 }
 
@@ -294,11 +430,11 @@ class ProgressManager {
     }
 }
 
-extension GameSession.GameContext {
-    var date: Date? {
-        switch self {
-        case .daily(let date): return date
-        default: return nil
-        }
-    }
-}
+//extension GameSession.GameContext {
+//    var date: Date? {
+//        switch self {
+//        case .daily(let date): return date
+//        default: return nil
+//        }
+//    }
+//}

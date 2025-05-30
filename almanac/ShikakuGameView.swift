@@ -51,7 +51,11 @@ struct ShikakuGameView: View {
         .padding()
 
         if session.game.isGameComplete {
-          completionView
+          VStack {
+            Spacer()
+            completionView
+              .animation(.bouncy,value: session.game.isGameComplete)
+          }
         }
       }
     }
@@ -69,6 +73,7 @@ struct ShikakuGameView: View {
     } message: {
       Text("Are you sure you want to exit? Progress will be lost.")
     }
+    .presentationBackground(.thinMaterial)
     .onAppear {
 //      session.game.generateReferenceLevel()
       gameTimer.displayTime = session.actualPlayTime

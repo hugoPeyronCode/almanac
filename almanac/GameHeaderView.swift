@@ -44,7 +44,7 @@ class GameTimer {
 struct GameHeaderView: View {
     let session: GameSession
     let showExitConfirmation: Binding<Bool>
-    let gameTimer: GameTimer // 🔥 NOUVEAU : Utiliser le timer observable
+    let gameTimer: GameTimer
     let subtitle: String?
     let onExit: () -> Void
 
@@ -70,7 +70,7 @@ struct GameHeaderView: View {
             } label: {
                 Image(systemName: "xmark")
                     .font(.title2)
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.primary)
                     .frame(width: 44, height: 44)
                     .background(.ultraThinMaterial, in: Circle())
             }
@@ -127,23 +127,11 @@ struct GameHeaderView: View {
     }
 
     // MARK: - Private Helpers
-
     private var contextTitle: String {
         switch session.context {
-        case .daily: return "Daily Puzzle"
+        case .daily: return "\(session.gameType.displayName) Date du jour"
         case .practice: return "Practice"
         case .random: return "Custom Level"
-        }
-    }
-
-    private func formatEstimatedTime(_ seconds: TimeInterval) -> String {
-        let minutes = Int(seconds) / 60
-        let remainingSeconds = Int(seconds) % 60
-
-        if minutes > 0 {
-            return "~\(minutes)m \(remainingSeconds)s"
-        } else {
-            return "~\(remainingSeconds)s"
         }
     }
 }

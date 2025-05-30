@@ -33,23 +33,33 @@ struct MultiGameCalendarView: View {
 
   var body: some View {
     NavigationStack(path: $coordinator.navigationPath) {
-      VStack(spacing: 0) {
-        headerView
+      ZStack{
+        VStack(spacing: 0) {
+          headerView
+          ScrollView(.vertical, showsIndicators: false) {
+            VStack(spacing: 32) {
+              gameFilterSection
+              calendarSection
+              selectedDateSection
+              quickStatsSection
 
-        ScrollView(.vertical, showsIndicators: false) {
-          VStack(spacing: 32) {
-            gameFilterSection
-            calendarSection
-            selectedDateSection
-            quickStatsSection
-
-            Spacer(minLength: 100)
+              Spacer(minLength: 100)
+            }
+            .padding(.top)
           }
-          .padding(.top)
+        }
+        VStack {
+          Spacer()
+
+          TabBar {
+            coordinator.showStatistics()
+          } middleButtonAction: {
+            //
+          } rightButtonAction: {
+            coordinator.push(.practiceMode)
+          }
         }
       }
-      .background(Color(.systemBackground))
-      .navigationTitle("")
       .environment(coordinator)
       .navigationDestination(for: GameCoordinator.NavigationDestination.self) { destination in
         navigationContent(for: destination)
@@ -62,14 +72,14 @@ struct MultiGameCalendarView: View {
     }
     .sheet(item: $coordinator.presentedSheet) { destination in
       sheetContent(for: destination)
+        .presentationBackground(.ultraThinMaterial)
     }
     .fullScreenCover(item: $coordinator.presentedFullScreen) { destination in
       fullScreenContent(for: destination)
+        .presentationBackground(.ultraThinMaterial)
     }
     .onAppear {
       progressManager = ProgressManager(modelContext: modelContext)
-
-      // Focus on today if not already selected
       let today = Date()
       if !calendar.isDate(selectedDate, inSameDayAs: today) {
         selectedDate = today
@@ -79,7 +89,6 @@ struct MultiGameCalendarView: View {
   }
 
   // MARK: - Header
-
   private var headerView: some View {
     HStack {
       Text("THE ALMANAC")
@@ -98,24 +107,6 @@ struct MultiGameCalendarView: View {
           .font(.title2)
           .foregroundStyle(Color.secondary)
       }
-
-      Button {
-        coordinator.push(.practiceMode)
-      } label: {
-        Image(systemName: "dumbbell.fill")
-          .font(.title2)
-          .foregroundStyle(Color.primary)
-      }
-      .sensoryFeedback(.impact(weight: .light), trigger: false)
-
-      Button {
-        coordinator.showStatistics()
-      } label: {
-        Image(systemName: "chart.line.uptrend.xyaxis")
-          .font(.title2)
-          .foregroundStyle(Color.primary)
-      }
-      .sensoryFeedback(.impact(weight: .light), trigger: false)
     }
     .padding(.horizontal)
     .padding(.top, 8)

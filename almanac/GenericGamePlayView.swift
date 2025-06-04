@@ -471,32 +471,6 @@ struct GamePlayView: View {
 }
 // MARK: - Supporting Views
 
-struct StatisticsView: View {
-    var body: some View {
-        Text("Statistics View")
-            .font(.title)
-    }
-}
-
-struct StatisticsSheet: View {
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        NavigationStack {
-            StatisticsView()
-                .navigationTitle("Statistics")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button("Done") {
-                            dismiss()
-                        }
-                    }
-                }
-        }
-    }
-}
-
 struct GameSelectionView: View {
     let date: Date
 

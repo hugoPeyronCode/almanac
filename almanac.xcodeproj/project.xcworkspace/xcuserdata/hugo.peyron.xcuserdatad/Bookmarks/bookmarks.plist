@@ -9,16 +9,12 @@
 			<dict>
 				<key>location-parameters</key>
 				<dict>
-					<key>EndingColumnNumber</key>
-					<string>10</string>
 					<key>EndingLineNumber</key>
 					<string>436</string>
-					<key>StartingColumnNumber</key>
-					<string>10</string>
 					<key>StartingLineNumber</key>
 					<string>436</string>
 					<key>Timestamp</key>
-					<string>770765515.531736</string>
+					<string>770769995.744815</string>
 				</dict>
 				<key>rebasable-url</key>
 				<dict>
@@ -34,15 +30,16 @@
 			<key>text-context</key>
 			<dict>
 				<key>focused</key>
-				<string></string>
+				<string>          return "Great job! 👏"
+</string>
 				<key>leading</key>
 				<string>
     private func getCongratulationText() -&gt; String {
-          </string>
+</string>
 				<key>trailing</key>
-				<string>return "Great job! 👏"
-    }
+				<string>    }
 
+    private func togglePause() {
 </string>
 			</dict>
 			<key>type</key>

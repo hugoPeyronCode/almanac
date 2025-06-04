@@ -291,9 +291,11 @@ extension GameSession.GameContext {
 class ProgressManager {
     private let modelContext: ModelContext
     private let levelManager = LevelManager.shared
+    private let statisticsManager: StatisticsManager
 
     init(modelContext: ModelContext) {
         self.modelContext = modelContext
+        self.statisticsManager = StatisticsManager(modelContext: modelContext)
     }
 
     func recordCompletion(session: GameSession) {
@@ -311,8 +313,8 @@ class ProgressManager {
         // Update game progress
         updateGameProgress(for: session.gameType, completionTime: session.actualPlayTime)
 
-        // Update streaks
-        updateStreaks(for: session.gameType, date: session.context.date)
+        // Update streaks using the new StatisticsManager
+        statisticsManager.updateStreaks(for: session.gameType)
 
         do {
             try modelContext.save()
@@ -332,35 +334,6 @@ class ProgressManager {
             let newProgress = GameProgress(gameType: gameType)
             newProgress.updateProgress(completionTime: completionTime)
             modelContext.insert(newProgress)
-        }
-    }
-
-    private func updateStreaks(for gameType: GameType, date: Date?) {
-        guard let _ = date else { return }
-
-        // Calculate current streak by checking consecutive days backwards from today
-        let today = Date()
-        let calendar = Calendar.current
-        var streakCount = 0
-        var checkDate = today
-
-        while true {
-            if hasCompletedDate(checkDate, gameType: gameType) {
-                streakCount += 1
-                guard let previousDay = calendar.date(byAdding: .day, value: -1, to: checkDate) else { break }
-                checkDate = previousDay
-            } else {
-                break
-            }
-        }
-
-        let fetchDescriptor = FetchDescriptor<GameProgress>(
-            predicate: #Predicate<GameProgress> { $0.gameType == gameType }
-        )
-
-        if let progress = try? modelContext.fetch(fetchDescriptor).first {
-            progress.currentStreak = streakCount
-            progress.maxStreak = max(progress.maxStreak, streakCount)
         }
     }
 
@@ -397,6 +370,11 @@ class ProgressManager {
             predicate: #Predicate<DailyCompletion> { $0.gameType == gameType }
         )
         return (try? modelContext.fetch(fetchDescriptor).count) ?? 0
+    }
+    
+    // Expose statistics manager for external use
+    var statistics: StatisticsManager {
+        return statisticsManager
     }
 }
 
@@ -470,5 +448,40 @@ extension GameSession {
     func cleanupGameInstance() {
         let sessionKey = "\(id.uuidString)"
         Self.gameInstances.removeValue(forKey: sessionKey)
+    }
+}
+
+extension GameSession {
+    private static var wordleGameInstances: [String: WordleGame] = [:]
+
+    var wordleGame: WordleGame {
+        let sessionKey = "\(id.uuidString)"
+
+        if let existingGame = Self.wordleGameInstances[sessionKey] {
+            return existingGame
+        }
+
+        let wordleGame: WordleGame
+        
+        if gameType == .wordle {
+            do {
+                let levelData = try level.decode(as: WordleLevelData.self)
+                wordleGame = WordleGame(targetWord: levelData.targetWord, maxAttempts: levelData.maxAttempts)
+                print("✅ Loaded Wordle level: \(levelData.id) - \(levelData.targetWord)")
+            } catch {
+                print("❌ Failed to decode Wordle level data: \(error)")
+                wordleGame = WordleGame(targetWord: "SWIFT", maxAttempts: 6)
+            }
+        } else {
+            wordleGame = WordleGame(targetWord: "SWIFT", maxAttempts: 6)
+        }
+
+        Self.wordleGameInstances[sessionKey] = wordleGame
+        return wordleGame
+    }
+
+    func cleanupWordleGameInstance() {
+        let sessionKey = "\(id.uuidString)"
+        Self.wordleGameInstances.removeValue(forKey: sessionKey)
     }
 }

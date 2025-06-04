@@ -44,6 +44,7 @@ struct CalendarView: View {
               gameFilterSection
               calendarSection
               selectedDateSection
+              streakSection
               quickStatsSection
 
               Spacer(minLength: 100)
@@ -54,13 +55,14 @@ struct CalendarView: View {
         VStack {
           Spacer()
 
-          TabBar {
-            coordinator.showStatistics()
-          } middleButtonAction: {
-            //
-          } rightButtonAction: {
-            coordinator.push(.practiceMode)
-          }
+          TabBar(
+            leftButtonAction: { coordinator.showStatistics() },
+            rightButtonAction: { coordinator.push(.practiceMode) },
+            selectedDate: selectedDate,
+            selectedGames: selectedGames,
+            progressManager: progressManager,
+            coordinator: coordinator
+          )
         }
       }
       .background {
@@ -360,6 +362,20 @@ struct CalendarView: View {
     .padding(.horizontal)
   }
 
+  // MARK: - Streak Section
+  
+  private var streakSection: some View {
+    VStack(spacing: 16) {
+      if !selectedGames.isEmpty {
+        StreakDisplayView(
+          selectedGames: selectedGames,
+          progressManager: progressManager
+        )
+        .padding(.horizontal)
+      }
+    }
+  }
+
   // MARK: - Quick Stats Section
 
   private var quickStatsSection: some View {
@@ -561,7 +577,7 @@ struct CalendarView: View {
       GameSelectionSheet(date: date)
         .environment(coordinator)
     case .statistics:
-      StatisticsSheet()
+      StatisticsView()
         .environment(coordinator)
         .environment(\.modelContext, modelContext)
     }
@@ -580,6 +596,8 @@ struct CalendarView: View {
           ShikakuGameView(session: session)
         case .sets:
           SetsGameView(session: session)
+        case .wordle:
+          WordleGameView(session: session)
         default:
           GamePlayView(session: session)
         }

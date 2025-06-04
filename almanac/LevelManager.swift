@@ -89,13 +89,13 @@ class LevelManager {
                 return try AnyGameLevel(pipeLevel)
 
             case .wordle:
-                let binarioLevel = BinarioLevelData(
+                let wordleLevel = WordleLevelData(
                     id: level.id,
                     difficulty: level.difficulty,
-                    gridSize: max(level.gridRows, level.gridCols),
-                    initialGrid: []
+                    targetWord: generateWordFromId(level.id),
+                    maxAttempts: 6
                 )
-                return try AnyGameLevel(binarioLevel)
+                return try AnyGameLevel(wordleLevel)
 
             case .sets:
                 let setsLevel = SetsLevelData(
@@ -134,11 +134,11 @@ class LevelManager {
                         pipes: []
                     )
                 case .wordle:
-                    levelData = BinarioLevelData(
-                        id: "binario_\(i)",
+                    levelData = WordleLevelData(
+                        id: "wordle_\(i)",
                         difficulty: difficulty,
-                        gridSize: 6 + (difficulty * 2),
-                        initialGrid: []
+                        targetWord: generateRandomWord(difficulty: difficulty),
+                        maxAttempts: 6
                     )
                 case .sets:
                     levelData = SetsLevelData(
@@ -173,6 +173,89 @@ class LevelManager {
 
         return clues
     }
+    
+    // Helper function to generate word from level ID for deterministic daily words
+    private func generateWordFromId(_ id: String) -> String {
+        // Use a large curated word list for better variety
+        let wordList = [
+            "ABOUT", "ABOVE", "ABUSE", "ACTOR", "ACUTE", "ADMIT", "ADOPT", "ADULT", "AFTER", "AGAIN",
+            "AGENT", "AGREE", "AHEAD", "ALARM", "ALBUM", "ALERT", "ALIEN", "ALIGN", "ALIKE", "ALIVE",
+            "ALLOW", "ALONE", "ALONG", "ALTER", "AMBER", "AMONG", "ANGER", "ANGLE", "ANGRY", "ANKLE",
+            "APART", "APPLE", "APPLY", "ARENA", "ARGUE", "ARISE", "ARMED", "ARMOR", "ARRAY", "ARROW",
+            "ASIDE", "ASSET", "AVOID", "AWAKE", "AWARD", "AWARE", "BADLY", "BAKER", "BASES", "BASIC",
+            "BEACH", "BEGAN", "BEGIN", "BEING", "BELLY", "BELOW", "BENCH", "BILLY", "BIRTH", "BLACK",
+            "BLADE", "BLAME", "BLANK", "BLAST", "BLIND", "BLOCK", "BLOOD", "BLOOM", "BOARD", "BOOST",
+            "BOOTH", "BOUND", "BRAIN", "BRAND", "BRASS", "BRAVE", "BREAD", "BREAK", "BREED", "BRICK",
+            "BRIEF", "BRING", "BROAD", "BROKE", "BROWN", "BUILD", "BUILT", "BUYER", "CABLE", "CHOSE",
+            "CIVIC", "CIVIL", "CLAIM", "CLASS", "CLEAN", "CLEAR", "CLICK", "CLIMB", "CLOCK", "CLOSE",
+            "CLOUD", "COACH", "COAST", "COULD", "COUNT", "COURT", "COVER", "CRAFT", "CRASH", "CRAZY",
+            "CREAM", "CRIME", "CROSS", "CROWD", "CROWN", "CRUDE", "CURVE", "CYCLE", "DAILY", "DANCE",
+            "DATED", "DEALT", "DEATH", "DEBUT", "DELAY", "DEPTH", "DOING", "DOUBT", "DOZEN", "DRAFT",
+            "DRAMA", "DRANK", "DRAWN", "DREAM", "DRESS", "DRILL", "DRINK", "DRIVE", "DROVE", "DYING",
+            "EAGER", "EARLY", "EARTH", "EIGHT", "ELITE", "EMPTY", "ENEMY", "ENJOY", "ENTER", "ENTRY",
+            "EQUAL", "ERROR", "EVENT", "EVERY", "EXACT", "EXIST", "EXTRA", "FAITH", "FALSE", "FAULT",
+            "FIBER", "FIELD", "FIFTH", "FIFTY", "FIGHT", "FINAL", "FIRST", "FIXED", "FLASH", "FLEET",
+            "FLOOR", "FLUID", "FOCUS", "FORCE", "FORTH", "FORTY", "FORUM", "FOUND", "FRAME", "FRANK",
+            "FRAUD", "FRESH", "FRONT", "FRUIT", "FULLY", "FUNNY", "GIANT", "GIVEN", "GLASS", "GLOBE",
+            "GLORY", "GOODS", "GRACE", "GRADE", "GRAIN", "GRAND", "GRANT", "GRASS", "GRAVE", "GREAT",
+            "GREEN", "GROSS", "GROUP", "GROWN", "GUARD", "GUESS", "GUEST", "GUIDE", "HAPPY", "HARRY",
+            "HEART", "HEAVY", "HORSE", "HOTEL", "HOUSE", "HUMAN", "IDEAL", "IMAGE", "INDEX", "INNER",
+            "INPUT", "ISSUE", "JAPAN", "JIMMY", "JOINT", "JONES", "JUDGE", "KNOWN", "LABEL", "LARGE",
+            "LASER", "LATER", "LAUGH", "LAYER", "LEARN", "LEASE", "LEAST", "LEAVE", "LEGAL", "LEVEL",
+            "LEWIS", "LIGHT", "LIMIT", "LINKS", "LIVES", "LOCAL", "LOOSE", "LOWER", "LUCKY", "LUNCH",
+            "LYING", "MAGIC", "MAJOR", "MAKER", "MARCH", "MARIA", "MATCH", "MAYBE", "MAYOR", "MEANT",
+            "MEDIA", "METAL", "MIGHT", "MINOR", "MINUS", "MIXED", "MODEL", "MONEY", "MONTH", "MORAL",
+            "MOTOR", "MOUNT", "MOUSE", "MOUTH", "MOVED", "MOVIE", "MUSIC", "NEEDS", "NEVER", "NEWLY",
+            "NIGHT", "NOISE", "NORTH", "NOTED", "NOVEL", "NURSE", "OCCUR", "OCEAN", "OFFER", "OFTEN",
+            "ORDER", "OTHER", "OUGHT", "PAINT", "PANEL", "PAPER", "PARTY", "PEACE", "PETER", "PHASE",
+            "PHONE", "PHOTO", "PIANO", "PIECE", "PILOT", "PITCH", "PLACE", "PLAIN", "PLANE", "PLANT",
+            "PLATE", "POINT", "POUND", "POWER", "PRESS", "PRICE", "PRIDE", "PRIME", "PRINT", "PRIOR",
+            "PRIZE", "PROOF", "PROUD", "PROVE", "QUEEN", "QUICK", "QUIET", "QUITE", "RADIO", "RAISE",
+            "RANGE", "RAPID", "RATIO", "REACH", "READY", "REALM", "REBEL", "REFER", "RELAX", "ENTRY",
+            "RIGHT", "RIVAL", "RIVER", "ROBIN", "ROGER", "ROMAN", "ROUGH", "ROUND", "ROUTE", "ROYAL",
+            "RURAL", "SCALE", "SCENE", "SCOPE", "SCORE", "SENSE", "SERVE", "SEVEN", "SHALL", "SHAPE",
+            "SHARE", "SHARP", "SHEET", "SHELF", "SHELL", "SHIFT", "SHINE", "SHIRT", "SHOCK", "SHOOT",
+            "SHORT", "SHOWN", "SIGHT", "SINCE", "SIXTH", "SIXTY", "SIZED", "SKILL", "SLEEP", "SLIDE",
+            "SMALL", "SMART", "SMILE", "SMITH", "SMOKE", "SNAKE", "SNOW", "SOCIAL", "SOLID", "SOLVE",
+            "SORRY", "SOUND", "SOUTH", "SPACE", "SPARE", "SPEAK", "SPEED", "SPEND", "SPENT", "SPLIT",
+            "SPOKE", "SPORT", "SQUAD", "STAFF", "STAGE", "STAKE", "STAND", "START", "STATE", "STEAM",
+            "STEEL", "STICK", "STILL", "STOCK", "STONE", "STOOD", "STORE", "STORM", "STORY", "STRIP",
+            "STUCK", "STUDY", "STUFF", "STYLE", "SUGAR", "SUITE", "SUPER", "SWEET", "SWIFT", "SWING",
+            "SWISS", "TABLE", "TAKEN", "TASTE", "TAXES", "TEACH", "TEAM", "TERRY", "TEXAS", "THANK",
+            "THEFT", "THEIR", "THEME", "THERE", "THESE", "THICK", "THING", "THINK", "THIRD", "THOSE",
+            "THREE", "THREW", "THROW", "THUMB", "TIGHT", "TIRED", "TITLE", "TODAY", "TOPIC", "TOTAL",
+            "TOUCH", "TOUGH", "TOWER", "TRACK", "TRADE", "TRAIN", "TREAT", "TREND", "TRIAL", "TRIBE",
+            "TRICK", "TRIED", "TRIES", "TRUCK", "TRULY", "TRUNK", "TRUST", "TRUTH", "TWICE", "UNCLE",
+            "UNDUE", "UNION", "UNITY", "UNTIL", "UPPER", "UPSET", "URBAN", "USAGE", "USUAL", "VALID",
+            "VALUE", "VIDEO", "VIRUS", "VISIT", "VITAL", "VOCAL", "WASTE", "WATCH", "WATER", "WHEEL",
+            "WHERE", "WHICH", "WHILE", "WHITE", "WHOLE", "WHOSE", "WOMAN", "WOMEN", "WORLD", "WORRY",
+            "WORSE", "WORST", "WORTH", "WOULD", "WRITE", "WRONG", "WROTE", "YOUNG", "YOURS", "YOUTH"
+        ]
+        
+        // Create a deterministic hash from the level ID
+        // Use a simple hash that will be consistent across devices and app launches
+        var hash: UInt32 = 5381
+        for char in id.utf8 {
+            hash = hash &* 33 &+ UInt32(char)
+        }
+        
+        let index = Int(hash) % wordList.count
+        return wordList[index]
+    }
+    
+    // Helper function to generate random word based on difficulty
+    private func generateRandomWord(difficulty: Int) -> String {
+        let wordsByDifficulty = [
+            1: ["APPLE", "HAPPY", "LIGHT", "MUSIC", "PEACE"],
+            2: ["SWIFT", "BRAVE", "GRACE", "TRUST", "DANCE"],
+            3: ["WORLD", "DREAM", "MAGIC", "POWER", "YOUTH"],
+            4: ["PHONE", "SMILE", "HEART", "HONOR", "SHINE"],
+            5: ["QUEST", "BLEND", "FROST", "SPARK", "STORM"]
+        ]
+        
+        let words = wordsByDifficulty[difficulty] ?? wordsByDifficulty[3]!
+        return words.randomElement() ?? "SWIFT"
+    }
 
     // MARK: - Daily Level Distribution
 
@@ -182,12 +265,103 @@ class LevelManager {
             return nil
         }
 
-        // Calculate deterministic index based on date
+        // For Wordle, create a special deterministic daily level based on date
+        if gameType == .wordle {
+            let dateFormatter = DateFormatter()
+            dateFormatter.dateFormat = "yyyy-MM-dd"
+            let dateString = dateFormatter.string(from: date)
+            
+            // Create deterministic level ID based on date
+            let levelId = "wordle_daily_\(dateString)"
+            
+            // Generate deterministic word for this specific date
+            let dailyWord = generateDeterministicWordForDate(date)
+            
+            do {
+                let wordleLevel = WordleLevelData(
+                    id: levelId,
+                    difficulty: 3,
+                    targetWord: dailyWord,
+                    maxAttempts: 5
+                )
+                return try AnyGameLevel(wordleLevel)
+            } catch {
+                print("❌ Failed to create daily Wordle level: \(error)")
+            }
+        }
+
+        // Calculate deterministic index based on date for other games
         let dayOffset = calendar.dateComponents([.day], from: referenceDate, to: date).day ?? 0
         let adjustedOffset = dayOffset + 100
         let levelIndex = ((adjustedOffset % levels.count) + levels.count) % levels.count
 
         return levels[levelIndex]
+    }
+    
+    // Generate a deterministic word based on the specific date
+    private func generateDeterministicWordForDate(_ date: Date) -> String {
+        let wordList = [
+            "ABOUT", "ABOVE", "ABUSE", "ACTOR", "ACUTE", "ADMIT", "ADOPT", "ADULT", "AFTER", "AGAIN",
+            "AGENT", "AGREE", "AHEAD", "ALARM", "ALBUM", "ALERT", "ALIEN", "ALIGN", "ALIKE", "ALIVE",
+            "ALLOW", "ALONE", "ALONG", "ALTER", "AMBER", "AMONG", "ANGER", "ANGLE", "ANGRY", "ANKLE",
+            "APART", "APPLE", "APPLY", "ARENA", "ARGUE", "ARISE", "ARMED", "ARMOR", "ARRAY", "ARROW",
+            "ASIDE", "ASSET", "AVOID", "AWAKE", "AWARD", "AWARE", "BADLY", "BAKER", "BASES", "BASIC",
+            "BEACH", "BEGAN", "BEGIN", "BEING", "BELLY", "BELOW", "BENCH", "BILLY", "BIRTH", "BLACK",
+            "BLADE", "BLAME", "BLANK", "BLAST", "BLIND", "BLOCK", "BLOOD", "BLOOM", "BOARD", "BOOST",
+            "BOOTH", "BOUND", "BRAIN", "BRAND", "BRASS", "BRAVE", "BREAD", "BREAK", "BREED", "BRICK",
+            "BRIEF", "BRING", "BROAD", "BROKE", "BROWN", "BUILD", "BUILT", "BUYER", "CABLE", "CHOSE",
+            "CIVIC", "CIVIL", "CLAIM", "CLASS", "CLEAN", "CLEAR", "CLICK", "CLIMB", "CLOCK", "CLOSE",
+            "CLOUD", "COACH", "COAST", "COULD", "COUNT", "COURT", "COVER", "CRAFT", "CRASH", "CRAZY",
+            "CREAM", "CRIME", "CROSS", "CROWD", "CROWN", "CRUDE", "CURVE", "CYCLE", "DAILY", "DANCE",
+            "DATED", "DEALT", "DEATH", "DEBUT", "DELAY", "DEPTH", "DOING", "DOUBT", "DOZEN", "DRAFT",
+            "DRAMA", "DRANK", "DRAWN", "DREAM", "DRESS", "DRILL", "DRINK", "DRIVE", "DROVE", "DYING",
+            "EAGER", "EARLY", "EARTH", "EIGHT", "ELITE", "EMPTY", "ENEMY", "ENJOY", "ENTER", "ENTRY",
+            "EQUAL", "ERROR", "EVENT", "EVERY", "EXACT", "EXIST", "EXTRA", "FAITH", "FALSE", "FAULT",
+            "FIBER", "FIELD", "FIFTH", "FIFTY", "FIGHT", "FINAL", "FIRST", "FIXED", "FLASH", "FLEET",
+            "FLOOR", "FLUID", "FOCUS", "FORCE", "FORTH", "FORTY", "FORUM", "FOUND", "FRAME", "FRANK",
+            "FRAUD", "FRESH", "FRONT", "FRUIT", "FULLY", "FUNNY", "GIANT", "GIVEN", "GLASS", "GLOBE",
+            "GLORY", "GOODS", "GRACE", "GRADE", "GRAIN", "GRAND", "GRANT", "GRASS", "GRAVE", "GREAT",
+            "GREEN", "GROSS", "GROUP", "GROWN", "GUARD", "GUESS", "GUEST", "GUIDE", "HAPPY", "HARRY",
+            "HEART", "HEAVY", "HORSE", "HOTEL", "HOUSE", "HUMAN", "IDEAL", "IMAGE", "INDEX", "INNER",
+            "INPUT", "ISSUE", "JAPAN", "JIMMY", "JOINT", "JONES", "JUDGE", "KNOWN", "LABEL", "LARGE",
+            "LASER", "LATER", "LAUGH", "LAYER", "LEARN", "LEASE", "LEAST", "LEAVE", "LEGAL", "LEVEL",
+            "LEWIS", "LIGHT", "LIMIT", "LINKS", "LIVES", "LOCAL", "LOOSE", "LOWER", "LUCKY", "LUNCH",
+            "LYING", "MAGIC", "MAJOR", "MAKER", "MARCH", "MARIA", "MATCH", "MAYBE", "MAYOR", "MEANT",
+            "MEDIA", "METAL", "MIGHT", "MINOR", "MINUS", "MIXED", "MODEL", "MONEY", "MONTH", "MORAL",
+            "MOTOR", "MOUNT", "MOUSE", "MOUTH", "MOVED", "MOVIE", "MUSIC", "NEEDS", "NEVER", "NEWLY",
+            "NIGHT", "NOISE", "NORTH", "NOTED", "NOVEL", "NURSE", "OCCUR", "OCEAN", "OFFER", "OFTEN",
+            "ORDER", "OTHER", "OUGHT", "PAINT", "PANEL", "PAPER", "PARTY", "PEACE", "PETER", "PHASE",
+            "PHONE", "PHOTO", "PIANO", "PIECE", "PILOT", "PITCH", "PLACE", "PLAIN", "PLANE", "PLANT",
+            "PLATE", "POINT", "POUND", "POWER", "PRESS", "PRICE", "PRIDE", "PRIME", "PRINT", "PRIOR",
+            "PRIZE", "PROOF", "PROUD", "PROVE", "QUEEN", "QUICK", "QUIET", "QUITE", "RADIO", "RAISE",
+            "RANGE", "RAPID", "RATIO", "REACH", "READY", "REALM", "REBEL", "REFER", "RELAX", "REPLY",
+            "RIGHT", "RIVAL", "RIVER", "ROBIN", "ROGER", "ROMAN", "ROUGH", "ROUND", "ROUTE", "ROYAL",
+            "RURAL", "SCALE", "SCENE", "SCOPE", "SCORE", "SENSE", "SERVE", "SEVEN", "SHALL", "SHAPE",
+            "SHARE", "SHARP", "SHEET", "SHELF", "SHELL", "SHIFT", "SHINE", "SHIRT", "SHOCK", "SHOOT",
+            "SHORT", "SHOWN", "SIGHT", "SINCE", "SIXTH", "SIXTY", "SIZED", "SKILL", "SLEEP", "SLIDE",
+            "SMALL", "SMART", "SMILE", "SMITH", "SMOKE", "SNAKE", "SOLID", "SOLVE", "SORRY", "SOUND",
+            "SOUTH", "SPACE", "SPARE", "SPEAK", "SPEED", "SPEND", "SPENT", "SPLIT", "SPOKE", "SPORT",
+            "SQUAD", "STAFF", "STAGE", "STAKE", "STAND", "START", "STATE", "STEAM", "STEEL", "STICK",
+            "STILL", "STOCK", "STONE", "STOOD", "STORE", "STORM", "STORY", "STRIP", "STUCK", "STUDY",
+            "STUFF", "STYLE", "SUGAR", "SUITE", "SUPER", "SWEET", "SWIFT", "SWING", "SWISS", "TABLE",
+            "TAKEN", "TASTE", "TAXES", "TEACH", "TERMS", "TERRY", "TEXAS", "THANK", "THEFT", "THEIR",
+            "THEME", "THERE", "THESE", "THICK", "THING", "THINK", "THIRD", "THOSE", "THREE", "THREW",
+            "THROW", "THUMB", "TIGHT", "TIRED", "TITLE", "TODAY", "TOPIC", "TOTAL", "TOUCH", "TOUGH",
+            "TOWER", "TRACK", "TRADE", "TRAIN", "TREAT", "TREND", "TRIAL", "TRIBE", "TRICK", "TRIED",
+            "TRIES", "TRUCK", "TRULY", "TRUNK", "TRUST", "TRUTH", "TWICE", "UNCLE", "UNDUE", "UNION",
+            "UNITY", "UNTIL", "UPPER", "UPSET", "URBAN", "USAGE", "USUAL", "VALID", "VALUE", "VIDEO",
+            "VIRUS", "VISIT", "VITAL", "VOCAL", "WASTE", "WATCH", "WATER", "WHEEL", "WHERE", "WHICH",
+            "WHILE", "WHITE", "WHOLE", "WHOSE", "WOMAN", "WOMEN", "WORLD", "WORRY", "WORSE", "WORST",
+            "WORTH", "WOULD", "WRITE", "WRONG", "WROTE", "YOUNG", "YOURS", "YOUTH"
+        ]
+        
+        // Use days since epoch as seed for maximum determinism
+        let referenceDate = Calendar.current.date(from: DateComponents(year: 2024, month: 1, day: 1))!
+        let daysSinceReference = Calendar.current.dateComponents([.day], from: referenceDate, to: date).day ?? 0
+        
+        // Ensure the same word for the same date across all devices
+        let index = abs(daysSinceReference) % wordList.count
+        return wordList[index]
     }
 
     func getAllLevelsForGame(_ gameType: GameType) -> [AnyGameLevel] {

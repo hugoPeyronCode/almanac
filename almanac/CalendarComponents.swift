@@ -54,11 +54,11 @@ struct CalendarDayView: View {
     VStack(spacing: 8) {
       ZStack {
         Circle()
-          .fill(backgroundColor)
+          .fill(.thinMaterial)
           .frame(width: 36, height: 36)
           .overlay(
             Circle()
-              .stroke(isSelected ? Color.indigo : Color.clear, lineWidth: 2)
+              .stroke(isSelected ? Color.primary : Color.clear, lineWidth: 2)
           )
           .overlay(progressRing)
 
@@ -66,11 +66,11 @@ struct CalendarDayView: View {
           Image(systemName: "checkmark")
             .font(.caption)
             .fontWeight(.bold)
-            .foregroundStyle(.background)
+            .foregroundStyle(.primary)
         } else if day.isCurrentMonth {
           Text("\(day.dayNumber)")
             .font(.system(size: 16, weight: isSelected ? .bold : .medium))
-            .foregroundStyle(textColor)
+            .foregroundStyle(dayState == .inactive ? . clear : .primary)
         }
       }
 
@@ -93,11 +93,11 @@ struct CalendarDayView: View {
           Image(systemName: "checkmark")
             .font(.title3)
             .fontWeight(.bold)
-            .foregroundStyle(.background)
+            .foregroundStyle(.primary)
         } else if day.isCurrentMonth {
           Text("\(day.dayNumber)")
             .font(.system(size: 16, weight: dayState == .today ? .bold : .medium))
-            .foregroundStyle(textColor)
+            .foregroundStyle(dayState == .inactive ? . clear : .primary)
         }
       }
 
@@ -106,45 +106,10 @@ struct CalendarDayView: View {
         .foregroundStyle(.secondary)
     }
   }
-
-  private var backgroundColor: Color {
-    switch dayState {
-    case .inactive:
-      return Color.clear
-    case .hasLevels:
-      return Color.secondary.opacity(0.1)
-    case .partiallyCompleted:
-      return Color.primary.opacity(0.2)
-    case .allCompleted:
-      return Color.primary
-    case .today:
-      return Color.primary.opacity(0.4)
-    }
-  }
-
-  private var textColor: Color {
-    switch dayState {
-    case .inactive:
-      return .clear
-    case .hasLevels:
-      return .primary
-    case .partiallyCompleted:
-      return .primary
-    case .allCompleted:
-      return .primary
-    case .today:
-      return .primary
-    }
-  }
-
   private var progressRing: some View {
     Group {
       if case .partiallyCompleted(let completed, let total) = completionStatus, completed > 0 {
         let progress = Double(completed) / Double(total)
-
-        Circle()
-          .stroke(Color.clear, lineWidth: 3)
-          .overlay(
             Circle()
               .trim(from: 0, to: progress)
               .stroke(
@@ -153,11 +118,10 @@ struct CalendarDayView: View {
                   startPoint: .topLeading,
                   endPoint: .bottomTrailing
                 ),
-                style: StrokeStyle(lineWidth: 3, lineCap: .round)
+                style: StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round)
               )
               .rotationEffect(.degrees(-90))
               .animation(.easeInOut(duration: 0.5), value: progress)
-          )
           .frame(width: isCompact ? 40 : 48, height: isCompact ? 40 : 48)
       }
     }
@@ -192,7 +156,7 @@ struct CalendarDayView: View {
         Circle()
           .stroke(
             LinearGradient(
-              colors: selectedGamesColors,
+              colors: [.primary],
               startPoint: .top,
               endPoint: .bottom
             ),
@@ -488,7 +452,7 @@ private func createMockLevel(for gameType: GameType) -> AnyGameLevel {
         gridSize: 3 + difficulty,
         pipes: []
       ))
-    case .binario:
+    case .wordle:
       return try AnyGameLevel(MockBinarioLevel(
         id: "\(gameType.rawValue)_mock",
         difficulty: difficulty,

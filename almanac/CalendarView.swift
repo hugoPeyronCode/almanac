@@ -64,7 +64,7 @@ struct CalendarView: View {
         }
       }
       .background {
-        Image(.dotsOfColors)
+        Image(.dotsBackground)
           .resizable()
           .scaledToFill()
           .overlay {

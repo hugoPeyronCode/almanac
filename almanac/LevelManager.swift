@@ -88,7 +88,7 @@ class LevelManager {
                 )
                 return try AnyGameLevel(pipeLevel)
 
-            case .binario:
+            case .wordle:
                 let binarioLevel = BinarioLevelData(
                     id: level.id,
                     difficulty: level.difficulty,
@@ -133,7 +133,7 @@ class LevelManager {
                         gridSize: 4 + difficulty,
                         pipes: []
                     )
-                case .binario:
+                case .wordle:
                     levelData = BinarioLevelData(
                         id: "binario_\(i)",
                         difficulty: difficulty,

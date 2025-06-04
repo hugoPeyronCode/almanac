@@ -577,7 +577,7 @@ struct GameSelectionSheet: View {
     ))
 
     let session = GameSession(
-        gameType: .binario,
+        gameType: .wordle,
         level: mockLevel,
         context: .random
     )
@@ -713,7 +713,7 @@ private func createMockLevel(for gameType: GameType) -> AnyGameLevel {
                 gridSize: 5,
                 pipes: []
             ))
-        case .binario:
+        case .wordle:
             return try AnyGameLevel(MockBinarioLevel(
                 id: "\(gameType.rawValue)_mock",
                 difficulty: 3,

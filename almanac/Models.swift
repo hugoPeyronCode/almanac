@@ -14,14 +14,14 @@ import Foundation
 enum GameType: String, CaseIterable, Codable {
     case shikaku = "shikaku"
     case pipe = "pipe"
-    case binario = "binario"
+    case wordle = "wordle"
     case sets = "Sets"
 
     var displayName: String {
         switch self {
         case .shikaku: return "Shikaku"
         case .pipe: return "Pipe"
-        case .binario: return "Binario"
+        case .wordle: return "Wordle"
         case .sets: return "Sets"
         }
     }
@@ -30,7 +30,7 @@ enum GameType: String, CaseIterable, Codable {
         switch self {
         case .shikaku: return "rectangle.grid.3x2"
         case .pipe: return "arrow.triangle.turn.up.right.diamond"
-        case .binario: return "01.circle"
+        case .wordle: return "01.circle"
         case .sets: return "staroflife.fill"
         }
     }
@@ -39,7 +39,7 @@ enum GameType: String, CaseIterable, Codable {
         switch self {
         case .shikaku: return .brown
         case .pipe: return .cyan
-        case .binario: return .orange
+        case .wordle: return .orange
         case .sets: return .purple
         }
     }

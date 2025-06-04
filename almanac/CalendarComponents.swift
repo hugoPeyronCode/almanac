@@ -13,6 +13,7 @@ struct CalendarDayView: View {
   let day: CalendarDay
   let isSelected: Bool
   let completionStatus: DayCompletionStatus
+  let selectedGamesColors: [Color]
   let isCompact: Bool
   let onTap: () -> Void
 
@@ -83,7 +84,7 @@ struct CalendarDayView: View {
     VStack(spacing: 4) {
       ZStack {
         Circle()
-          .fill(backgroundColor)
+          .foregroundStyle(.thinMaterial)
           .frame(width: 44, height: 44)
           .overlay(progressRing)
           .overlay(selectionHighlight)
@@ -148,7 +149,7 @@ struct CalendarDayView: View {
               .trim(from: 0, to: progress)
               .stroke(
                 LinearGradient(
-                  colors: [.primary, .gray],
+                  colors: selectedGamesColors,
                   startPoint: .topLeading,
                   endPoint: .bottomTrailing
                 ),
@@ -187,11 +188,11 @@ struct CalendarDayView: View {
 
   private var selectionHighlight: some View {
     Group {
-      if isSelected && !isCompact {
+      if isSelected {
         Circle()
           .stroke(
             LinearGradient(
-              colors: [.indigo],
+              colors: selectedGamesColors,
               startPoint: .top,
               endPoint: .bottom
             ),
@@ -212,7 +213,7 @@ struct CalendarDayView: View {
 
 
 #Preview {
-  CalendarDayView(day: CalendarDay(date: Date(), dayNumber: 20, isCurrentMonth: true), isSelected: true, completionStatus: .partiallyCompleted(1, 5), isCompact: false) {
+  CalendarDayView(day: CalendarDay(date: Date(), dayNumber: 20, isCurrentMonth: true), isSelected: true, completionStatus: .partiallyCompleted(1, 5), selectedGamesColors: [.purple, .cyan, .brown, .orange], isCompact: false) {
     //
   }
 }
@@ -230,23 +231,19 @@ struct GameDayCard: View {
 
   var body: some View {
     VStack(spacing: 0) {
-      // Top section with game info
       topSection
         .padding(.top, 16)
         .padding(.horizontal, 16)
 
       Spacer()
 
-      // Bottom section with level info and controls
       bottomSection
         .padding(16)
         .background(gameType.color.opacity(0.1))
         .clipShape(RoundedRectangle(cornerRadius: 16))
     }
-    .containerRelativeFrame([.horizontal]) { length, _ in
-      length * 0.45
-    }
-    .frame(height: 160)
+    .frame(height: 100)
+    .frame(maxWidth: .infinity)
     .background(
       RoundedRectangle(cornerRadius: 16)
         .fill(.thinMaterial)
@@ -258,7 +255,6 @@ struct GameDayCard: View {
           isCompleted ? .gray.opacity(0.3) : gameType.color,
           lineWidth: isCompleted ? 0.5 : 1
         )
-//        .shadow(color: !isCompleted ? .primary : .clear , radius: 2)
     )
     .overlay(
       Group {
@@ -268,7 +264,7 @@ struct GameDayCard: View {
               Spacer()
               Image(systemName: "checkmark.circle.fill")
                 .font(.title2)
-                .foregroundStyle(Color.primary)
+                .foregroundStyle(gameType.color)
             }
             .padding(.top, 12)
             .padding(.trailing, 12)
@@ -299,7 +295,7 @@ struct GameDayCard: View {
   }
 
   private var bottomSection: some View {
-    VStack(spacing: 12) {
+    HStack(spacing: 12) {
       // Level info with stars and player time
       HStack {
         if let level = level {
@@ -351,15 +347,12 @@ struct GameDayCard: View {
       HStack {
         if isCompleted {
           HStack(spacing: 6) {
-            Image(systemName: "checkmark.circle.fill")
-              .font(.caption)
-              .foregroundStyle(Color.primary)
             Text("Completed")
               .font(.caption)
               .fontWeight(.medium)
               .foregroundStyle(Color.primary)
           }
-          .frame(maxWidth: .infinity)
+          .frame(maxWidth: 100)
           .padding(.vertical, 8)
           .background(
             RoundedRectangle(cornerRadius: 8)
@@ -376,9 +369,9 @@ struct GameDayCard: View {
                 .fontWeight(.medium)
             }
             .foregroundStyle(.background)
-            .frame(maxWidth: .infinity)
+            .frame(minWidth: 100)
             .padding(.vertical, 8)
-            .background(Color.primary, in: RoundedRectangle(cornerRadius: 8))
+            .background(gameType.color, in: RoundedRectangle(cornerRadius: 8))
           }
           .sensoryFeedback(.impact(weight: .medium), trigger: false)
         }
@@ -503,7 +496,7 @@ private func createMockLevel(for gameType: GameType) -> AnyGameLevel {
         gridSize: 4 + (difficulty * 2),
         initialGrid: []
       ))
-    case .wordle:
+    case .sets:
       return try AnyGameLevel(MockWordleLevel(
         id: "\(gameType.rawValue)_mock",
         difficulty: difficulty,

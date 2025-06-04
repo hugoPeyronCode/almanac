@@ -8,7 +8,7 @@
 import SwiftUI
 import SwiftData
 
-struct MultiGameCalendarView: View {
+struct CalendarView: View {
   @Environment(\.colorScheme) var colorScheme
   @Environment(\.modelContext) private var modelContext
 
@@ -23,17 +23,20 @@ struct MultiGameCalendarView: View {
   @State private var isCompactMode = true
   @State private var showingCompletionCelebration = false
 
-  // MARK: - Game Filter State
-  @State private var selectedGames: Set<GameType> = Set(GameType.allCases)
+  // MARK: - Game Filter State with UserDefaults persistence
+  @State private var selectedGames: Set<GameType> = []
   @State private var showingAllGames = true
   @State private var showingFilters = false
 
   private let levelManager = LevelManager.shared
   private let calendar = Calendar.current
 
+  private let selectedGamesKey = "SelectedGameTypes"
+
   var body: some View {
     NavigationStack(path: $coordinator.navigationPath) {
       ZStack{
+
         VStack(spacing: 0) {
           headerView
           ScrollView(.vertical, showsIndicators: false) {
@@ -60,6 +63,16 @@ struct MultiGameCalendarView: View {
           }
         }
       }
+      .background {
+        Image(.dotsOfColors)
+          .resizable()
+          .scaledToFill()
+          .overlay {
+            Rectangle()
+              .foregroundStyle(.thinMaterial)
+              .ignoresSafeArea()
+          }
+      }
       .environment(coordinator)
       .navigationDestination(for: GameCoordinator.NavigationDestination.self) { destination in
         navigationContent(for: destination)
@@ -85,6 +98,9 @@ struct MultiGameCalendarView: View {
         selectedDate = today
         currentMonth = today
       }
+
+      // Load selected games from UserDefaults on first appearance
+      loadSelectedGamesFromUserDefaults()
     }
   }
 
@@ -213,6 +229,7 @@ struct MultiGameCalendarView: View {
               day: day,
               isSelected: calendar.isDate(day.date, inSameDayAs: selectedDate),
               completionStatus: getFilteredDayCompletionStatus(day.date),
+              selectedGamesColors: selectedGames.colors,
               isCompact: true
             ) {
               selectDate(day.date)
@@ -242,6 +259,7 @@ struct MultiGameCalendarView: View {
           day: day,
           isSelected: calendar.isDate(day.date, inSameDayAs: selectedDate),
           completionStatus: getFilteredDayCompletionStatus(day.date),
+          selectedGamesColors: selectedGames.colors,
           isCompact: false
         ) {
           selectDate(day.date)
@@ -316,7 +334,8 @@ struct MultiGameCalendarView: View {
         }
         .frame(maxWidth: .infinity, minHeight: 120)
       } else {
-        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 16), count: 2), spacing: 16) {
+        //  LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 16), count: 2), spacing: 16)
+        LazyVStack {
           ForEach(Array(selectedGames).sorted(by: { $0.rawValue < $1.rawValue }), id: \.self) { gameType in
             GameDayCard(
               gameType: gameType,
@@ -399,6 +418,30 @@ struct MultiGameCalendarView: View {
     .padding(.horizontal)
   }
 
+  // MARK: - UserDefaults Persistence Methods
+
+  private func loadSelectedGamesFromUserDefaults() {
+    if let savedGameTypes = UserDefaults.standard.array(forKey: selectedGamesKey) as? [String] {
+      let gameTypes = savedGameTypes.compactMap { GameType(rawValue: $0) }
+      selectedGames = Set(gameTypes)
+
+      // If no valid games were saved or all games are selected, default to all games
+      if selectedGames.isEmpty {
+        selectedGames = Set(GameType.allCases)
+      }
+    } else {
+      // First time launch - default to all games
+      selectedGames = Set(GameType.allCases)
+    }
+
+    updateSelectAllState()
+  }
+
+  private func saveSelectedGamesToUserDefaults() {
+    let gameTypeStrings = selectedGames.map { $0.rawValue }
+    UserDefaults.standard.set(gameTypeStrings, forKey: selectedGamesKey)
+  }
+
   // MARK: - Game Filter Logic
 
   private func toggleGameSelection(_ gameType: GameType) {
@@ -408,6 +451,7 @@ struct MultiGameCalendarView: View {
       selectedGames.insert(gameType)
     }
     updateSelectAllState()
+    saveSelectedGamesToUserDefaults()
   }
 
   private func toggleSelectAll() {
@@ -418,6 +462,7 @@ struct MultiGameCalendarView: View {
       selectedGames = Set(GameType.allCases)
       showingAllGames = true
     }
+    saveSelectedGamesToUserDefaults()
   }
 
   private func updateSelectAllState() {
@@ -533,6 +578,8 @@ struct MultiGameCalendarView: View {
           PipeGameView(session: session)
         case .shikaku:
           ShikakuGameView(session: session)
+        case .sets:
+          SetsGameView(session: session)
         default:
           GamePlayView(session: session)
         }
@@ -644,6 +691,7 @@ struct MultiGameCalendarView: View {
     return allProgress.first { $0.gameType == gameType }
   }
 }
+
 // MARK: - Supporting Types
 
 struct CalendarDay {
@@ -657,7 +705,6 @@ enum DayCompletionStatus {
   case partiallyCompleted(Int, Int)
   case allCompleted
 }
-
 
 #Preview("Calendar - With Sample Data") {
     let config = ModelConfiguration(isStoredInMemoryOnly: true)
@@ -701,10 +748,9 @@ enum DayCompletionStatus {
 
     try? context.save()
 
-    return MultiGameCalendarView()
+    return CalendarView()
         .modelContainer(container)
 }
-
 
 // MARK: - Game Filter Chip Component
 
@@ -764,5 +810,12 @@ struct GameFilterChip: View {
             }
         }
         .padding()
+    }
+}
+
+extension Set where Element == GameType {
+    /// Retourne un tableau des couleurs des jeux sélectionnés
+    var colors: [Color] {
+        return self.sorted(by: { $0.rawValue < $1.rawValue }).map { $0.color }
     }
 }

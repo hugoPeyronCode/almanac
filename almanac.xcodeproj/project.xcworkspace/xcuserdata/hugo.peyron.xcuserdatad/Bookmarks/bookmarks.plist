@@ -12,13 +12,13 @@
 					<key>EndingColumnNumber</key>
 					<string>6</string>
 					<key>EndingLineNumber</key>
-					<string>437</string>
+					<string>436</string>
 					<key>StartingColumnNumber</key>
 					<string>0</string>
 					<key>StartingLineNumber</key>
-					<string>437</string>
+					<string>436</string>
 					<key>Timestamp</key>
-					<string>770296106.696354</string>
+					<string>770631378.543133</string>
 				</dict>
 				<key>rebasable-url</key>
 				<dict>
@@ -34,15 +34,15 @@
 			<key>text-context</key>
 			<dict>
 				<key>focused</key>
-				<string>      </string>
+				<string></string>
 				<key>leading</key>
-				<string>    private func getCongratulationText() -&gt; String {
-
-</string>
+				<string>
+    private func getCongratulationText() -&gt; String {
+          </string>
 				<key>trailing</key>
-				<string>// Make this random
-            return "Excellent performance! 🏆"
-            return "Great job! 👏"
+				<string>return "Great job! 👏"
+    }
+
 </string>
 			</dict>
 			<key>type</key>

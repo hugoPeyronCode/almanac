@@ -434,12 +434,7 @@ struct GamePlayView: View {
     }
 
     private func getCongratulationText() -> String {
-
-      // Make this random
-            return "Excellent performance! 🏆"
-            return "Great job! 👏"
-            return "Well done! 👍"
-            return "Keep practicing! 💪"
+          return "Great job! 👏"
     }
 
     private func togglePause() {
@@ -601,7 +596,7 @@ struct GameSelectionSheet: View {
     ))
 
     let session = GameSession(
-        gameType: .wordle,
+        gameType: .sets,
         level: mockLevel,
         context: .daily(Date())
     )
@@ -666,7 +661,7 @@ struct GameSelectionSheet: View {
     ))
 
     let session = GameSession(
-        gameType: .wordle,
+        gameType: .sets,
         level: mockLevel,
         context: .practice
     )
@@ -726,7 +721,7 @@ private func createMockLevel(for gameType: GameType) -> AnyGameLevel {
                 gridSize: 6,
                 initialGrid: []
             ))
-        case .wordle:
+        case .sets:
             return try AnyGameLevel(MockWordleLevel(
                 id: "\(gameType.rawValue)_mock",
                 difficulty: 3,
@@ -803,7 +798,6 @@ struct MockWordleLevel: GameLevelData {
 
     GamePlayView(session: session)
         .environment(GameCoordinator())
-        .previewDevice("iPhone SE (3rd generation)")
 }
 
 #Preview("GamePlayView - iPhone 15 Pro Max") {
@@ -822,5 +816,4 @@ struct MockWordleLevel: GameLevelData {
     )
     GamePlayView(session: session)
         .environment(GameCoordinator())
-        .previewDevice("iPhone 15 Pro Max")
 }

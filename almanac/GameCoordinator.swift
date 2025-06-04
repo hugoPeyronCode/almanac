@@ -336,7 +336,7 @@ class ProgressManager {
     }
 
     private func updateStreaks(for gameType: GameType, date: Date?) {
-        guard let date = date else { return }
+        guard let _ = date else { return }
 
         // Calculate current streak by checking consecutive days backwards from today
         let today = Date()
@@ -400,11 +400,75 @@ class ProgressManager {
     }
 }
 
-//extension GameSession.GameContext {
-//    var date: Date? {
-//        switch self {
-//        case .daily(let date): return date
-//        default: return nil
-//        }
-//    }
-//}
+// MARK: Sets GameSession Extension
+extension GameSession {
+  private static var setsGameInstances: [String: SetsGame] = [:]
+
+  var setsGame: SetsGame {
+    let sessionKey = "\(id.uuidString)"
+
+    if let existingGame = Self.setsGameInstances[sessionKey] {
+      return existingGame
+    }
+
+    let setsGame = SetsGame()
+
+    if gameType == .sets {
+      let levelData = SetsLevelData(id: level.id, difficulty: level.difficulty)
+      setsGame.loadLevel(levelData)
+      print("✅ Loaded Sets level: \(levelData.id)")
+    }
+
+    Self.setsGameInstances[sessionKey] = setsGame
+    return setsGame
+  }
+
+  func cleanupSetsGameInstance() {
+    let sessionKey = "\(id.uuidString)"
+    Self.setsGameInstances.removeValue(forKey: sessionKey)
+  }
+}
+
+extension GameSession {
+    private static var gameInstances: [String: ShikakuGame] = [:]
+
+    var shikakuGame: ShikakuGame {
+        // Use session ID as key to maintain unique game instances
+        let sessionKey = "\(id.uuidString)"
+
+        // Return existing game instance if it exists
+        if let existingGame = Self.gameInstances[sessionKey] {
+            return existingGame
+        }
+
+        // Create new game instance for this session
+        let shikakuGame = ShikakuGame()
+
+        // Load the actual level data if it's a Shikaku level
+        if gameType == .shikaku {
+            do {
+                let levelData = try level.decode(as: ShikakuLevelData.self)
+                shikakuGame.loadLevel(levelData)
+                print("✅ Loaded Shikaku level: \(levelData.id)")
+            } catch {
+                print("❌ Failed to decode Shikaku level data: \(error)")
+                // Fallback: create a default level
+                shikakuGame.loadDefaultLevel()
+            }
+        } else {
+            // For non-Shikaku games, load default
+            shikakuGame.loadDefaultLevel()
+        }
+
+        // Store the game instance
+        Self.gameInstances[sessionKey] = shikakuGame
+
+        return shikakuGame
+    }
+
+    // Clean up game instance when session ends
+    func cleanupGameInstance() {
+        let sessionKey = "\(id.uuidString)"
+        Self.gameInstances.removeValue(forKey: sessionKey)
+    }
+}

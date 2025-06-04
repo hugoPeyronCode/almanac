@@ -97,14 +97,12 @@ class LevelManager {
                 )
                 return try AnyGameLevel(binarioLevel)
 
-            case .wordle:
-                let wordleLevel = WordleLevelData(
+            case .sets:
+                let setsLevel = SetsLevelData(
                     id: level.id,
-                    difficulty: level.difficulty,
-                    targetWord: "SWIFT", // You'll need to add this to your JSON
-                    maxAttempts: 6
+                    difficulty: level.difficulty
                 )
-                return try AnyGameLevel(wordleLevel)
+                return try AnyGameLevel(setsLevel)
             }
         }
     }
@@ -142,12 +140,10 @@ class LevelManager {
                         gridSize: 6 + (difficulty * 2),
                         initialGrid: []
                     )
-                case .wordle:
-                    levelData = WordleLevelData(
-                        id: "wordle_\(i)",
-                        difficulty: difficulty,
-                        targetWord: "SWIFT",
-                        maxAttempts: 6
+                case .sets:
+                    levelData = SetsLevelData(
+                        id: "sets_\(i)",
+                        difficulty: difficulty
                     )
                 }
 
@@ -298,6 +294,31 @@ struct BinarioLevelData: GameLevelData {
         self.initialGrid = initialGrid.isEmpty ? Array(repeating: Array(repeating: nil, count: gridSize), count: gridSize) : initialGrid
     }
 }
+
+// MARK: - Sets Level Data Structure
+
+struct SetsLevelData: GameLevelData {
+    let id: String
+    let difficulty: Int
+    let targetSets: Int
+
+    init(id: String, difficulty: Int) {
+        self.id = id
+        self.difficulty = difficulty
+
+        // Target sets based on difficulty
+        switch difficulty {
+        case 1: self.targetSets = 5
+        case 2: self.targetSets = 8
+        case 3: self.targetSets = 12
+        case 4: self.targetSets = 16
+        case 5: self.targetSets = 20
+        default: self.targetSets = 10
+        }
+    }
+}
+
+// MARK: - Legacy WordleLevelData (Remove this later)
 
 struct WordleLevelData: GameLevelData {
     let id: String

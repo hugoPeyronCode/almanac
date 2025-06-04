@@ -8,6 +8,26 @@
 import SwiftUI
 import SwiftData
 
+// MARK: - Temporary Debug Button
+struct DebugCompleteButton: View {
+    let session: GameSession
+    let label: String
+    
+    var body: some View {
+        Button("🚀 DEBUG: \(label)") {
+            print("🔧 DEBUG: Force completing \(session.gameType.displayName)")
+            session.complete()
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(.red.opacity(0.2))
+        .foregroundStyle(.red)
+        .cornerRadius(8)
+        .font(.caption)
+        .fontWeight(.medium)
+    }
+}
+
 @Observable
 class GameCoordinator {
     var navigationPath = NavigationPath()
@@ -299,6 +319,9 @@ class ProgressManager {
     }
 
     func recordCompletion(session: GameSession) {
+        print("💾 Recording completion for \(session.gameType.displayName)")
+        print("   📅 Session context: \(session.context)")
+        
         // Record daily completion
         if case .daily(let date) = session.context {
             let completion = DailyCompletion(
@@ -307,7 +330,15 @@ class ProgressManager {
                 levelDataId: session.level.id,
                 completionTime: session.actualPlayTime
             )
+            print("   📝 Creating DailyCompletion:")
+            print("      - Date: \(date)")
+            print("      - Game: \(session.gameType.displayName)")
+            print("      - Time: \(session.actualPlayTime)")
+            
             modelContext.insert(completion)
+            print("   ✅ DailyCompletion inserted into context")
+        } else {
+            print("   ⏭️ Not a daily session, skipping daily completion")
         }
 
         // Update game progress
@@ -318,6 +349,7 @@ class ProgressManager {
 
         do {
             try modelContext.save()
+            print("   💾 Context saved successfully")
         } catch {
             print("❌ Failed to save completion: \(error)")
         }

@@ -75,20 +75,26 @@ struct PipeGameView: View {
 
             Spacer()
 
-            // Controls
-            HStack(spacing: 20) {
-                Button("Reset") {
-                    gameState.reset()
-                }
-                .padding()
-                .background(.blue)
-                .foregroundStyle(.white)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
+            // Debug and Controls
+            VStack(spacing: 12) {
+                // Debug button
+                DebugCompleteButton(session: session, label: "Force Win")
+                    .disabled(session.isCompleted)
+                
+                HStack(spacing: 20) {
+                    Button("Reset") {
+                        gameState.reset()
+                    }
+                    .padding()
+                    .background(.blue)
+                    .foregroundStyle(.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
 
-                if gameState.isComplete {
-                    Text("🎉 Complete!")
-                        .font(.headline)
-                        .foregroundStyle(.green)
+                    if gameState.isComplete {
+                        Text("🎉 Complete!")
+                            .font(.headline)
+                            .foregroundStyle(.green)
+                    }
                 }
             }
             .padding()

@@ -13,6 +13,10 @@ struct StatisticsView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     
+    // SwiftData queries to observe changes
+    @Query private var allCompletions: [DailyCompletion]
+    @Query private var allProgress: [GameProgress]
+    
     @State private var statisticsManager: StatisticsManager?
     @State private var selectedPeriod: StatisticsPeriod = .thisWeek
     @State private var selectedGameFilter: GameFilterOption = .all
@@ -81,6 +85,8 @@ struct StatisticsView: View {
             .onChange(of: selectedPeriod) { _, _ in loadStatistics() }
             .onChange(of: selectedGameFilter) { _, _ in loadStatistics() }
             .onChange(of: selectedGames) { _, _ in loadStatistics() }
+            .onChange(of: allCompletions) { _, _ in loadStatistics() }
+            .onChange(of: allProgress) { _, _ in loadStatistics() }
         }
     }
     
@@ -111,11 +117,11 @@ struct StatisticsView: View {
             Text(period.displayName)
                 .font(.caption)
                 .fontWeight(.medium)
-                .foregroundStyle(selectedPeriod == period ? .primary : .secondary)
+                .foregroundStyle(selectedPeriod == period ? Color.primary : Color.secondary)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
                 .background(
-                  selectedPeriod == period ? .red : .clear,
+                  selectedPeriod == period ? .thinMaterial : .ultraThinMaterial,
                     in: Capsule()
                 )
                 .overlay(
@@ -142,11 +148,11 @@ struct StatisticsView: View {
             Text(option.displayName)
                 .font(.caption)
                 .fontWeight(.medium)
-                .foregroundStyle(selectedGameFilter == option ? .primary : .secondary)
+                .foregroundStyle(selectedGameFilter == option ? Color.primary : Color.secondary)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
                 .background(
-                    selectedGameFilter == option ? .purple : .clear,
+                  selectedGameFilter == option ? .thinMaterial : .ultraThinMaterial,
                     in: Capsule()
                 )
                 .overlay(

@@ -207,15 +207,9 @@ struct GamePlayView: View {
                     .multilineTextAlignment(.center)
                     .padding(.horizontal)
 
-                // Mock completion button for testing
-                Button("Complete Game (Test)") {
-                    completeGame()
-                }
-                .padding()
-                .background(session.gameType.color)
-                .foregroundStyle(.white)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                .disabled(session.isCompleted)
+                // Debug completion button
+                DebugCompleteButton(session: session, label: "Complete Game")
+                    .disabled(session.isCompleted)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(

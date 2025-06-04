@@ -116,7 +116,12 @@ struct ShikakuGameView: View {
 
   private var controlsView: some View {
     HStack {
+      // Debug button
+      DebugCompleteButton(session: session, label: "Force Win")
+        .disabled(session.isCompleted)
+      
       Spacer()
+      
       Button {
         withAnimation(.spring(duration: 0.3)) {
           session.shikakuGame.clearBoard()
@@ -130,7 +135,6 @@ struct ShikakuGameView: View {
       .sensoryFeedback(.impact(weight: .medium), trigger: session.shikakuGame.rectangles.isEmpty)
 
       Spacer()
-
     }
   }
 

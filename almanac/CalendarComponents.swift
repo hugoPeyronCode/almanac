@@ -15,6 +15,7 @@ struct CalendarDayView: View {
   let completionStatus: DayCompletionStatus
   let selectedGamesColors: [Color]
   let isCompact: Bool
+  let canPlay: Bool
   let onTap: () -> Void
 
   private var isToday: Bool {
@@ -23,6 +24,7 @@ struct CalendarDayView: View {
 
   private var dayState: DayState {
     if !day.isCurrentMonth && !isCompact { return .inactive }
+    if !canPlay { return .disabled }
     if isToday { return .today }
 
     switch completionStatus {
@@ -33,7 +35,7 @@ struct CalendarDayView: View {
   }
 
   enum DayState {
-    case inactive, hasLevels, partiallyCompleted, allCompleted, today
+    case inactive, hasLevels, partiallyCompleted, allCompleted, today, disabled
   }
 
   var body: some View {
@@ -46,7 +48,7 @@ struct CalendarDayView: View {
       }
     }
     .buttonStyle(.plain)
-    .disabled(!day.isCurrentMonth && !isCompact)
+    .disabled((!day.isCurrentMonth && !isCompact) || !canPlay)
     .sensoryFeedback(.impact(weight: .light), trigger: isSelected)
   }
 
@@ -70,7 +72,7 @@ struct CalendarDayView: View {
         } else if day.isCurrentMonth {
           Text("\(day.dayNumber)")
             .font(.system(size: 16, weight: isSelected ? .bold : .medium))
-            .foregroundStyle(dayState == .inactive ? . clear : .primary)
+            .foregroundStyle(dayState == .inactive ? .clear : dayState == .disabled ? .secondary : .primary)
         }
       }
 
@@ -78,6 +80,7 @@ struct CalendarDayView: View {
         .font(.system(size: 10, weight: .medium))
         .foregroundStyle(.secondary)
     }
+    .opacity(dayState == .disabled ? 0.4 : 1.0)
   }
 
   private var fullDayView: some View {
@@ -177,7 +180,7 @@ struct CalendarDayView: View {
 
 
 #Preview {
-  CalendarDayView(day: CalendarDay(date: Date(), dayNumber: 20, isCurrentMonth: true), isSelected: true, completionStatus: .partiallyCompleted(1, 5), selectedGamesColors: [.purple, .cyan, .brown, .orange], isCompact: false) {
+  CalendarDayView(day: CalendarDay(date: Date(), dayNumber: 20, isCurrentMonth: true), isSelected: true, completionStatus: .partiallyCompleted(1, 5), selectedGamesColors: [.purple, .cyan, .brown, .orange], isCompact: false, canPlay: true) {
     //
   }
 }
@@ -190,6 +193,7 @@ struct GameDayCard: View {
   let level: AnyGameLevel?
   let isCompleted: Bool
   let progress: GameProgress?
+  let canPlay: Bool
   let onTap: () -> Void
   let onMarkComplete: (() -> Void)? = nil // Always nil now
 
@@ -216,10 +220,11 @@ struct GameDayCard: View {
     .overlay(
       RoundedRectangle(cornerRadius: 16)
         .stroke(
-          isCompleted ? .gray.opacity(0.3) : gameType.color,
-          lineWidth: isCompleted ? 0.5 : 1
+          !canPlay ? .orange.opacity(0.5) : isCompleted ? .gray.opacity(0.3) : gameType.color,
+          lineWidth: !canPlay ? 1 : isCompleted ? 0.5 : 1
         )
     )
+    .opacity(canPlay ? 1.0 : 0.6)
     .overlay(
       Group {
         if isCompleted {
@@ -289,7 +294,18 @@ struct GameDayCard: View {
 
         Spacer()
 
-        if let progress = progress, progress.currentStreak > 0 {
+        if !canPlay {
+          VStack(alignment: .trailing, spacing: 2) {
+            HStack(spacing: 2) {
+              Image(systemName: "clock.badge.xmark")
+                .font(.caption)
+                .foregroundStyle(.orange)
+            }
+            Text("Non disponible")
+              .font(.caption2)
+              .foregroundStyle(.orange)
+          }
+        } else if let progress = progress, progress.currentStreak > 0 {
           VStack(alignment: .trailing, spacing: 2) {
             HStack(spacing: 2) {
               Image(systemName: "flame.fill")
@@ -405,11 +421,41 @@ struct StatCard: View {
         level: mockLevel,
         isCompleted: Bool.random(),
         progress: mockProgress,
+        canPlay: true,
         onTap: {
           print("\(gameType.displayName) tapped")
         }
       )
     }
+  }
+  .padding()
+}
+
+#Preview("GameDayCard - Future Date (Unavailable)") {
+  VStack(spacing: 16) {
+    GameDayCard(
+      gameType: .wordle,
+      date: Date().addingTimeInterval(86400), // Tomorrow
+      level: createMockLevel(for: .wordle),
+      isCompleted: false,
+      progress: createMockProgress(for: .wordle),
+      canPlay: false,
+      onTap: {
+        print("Future game tapped")
+      }
+    )
+    
+    GameDayCard(
+      gameType: .shikaku,
+      date: Date(),
+      level: createMockLevel(for: .shikaku),
+      isCompleted: true,
+      progress: createMockProgress(for: .shikaku),
+      canPlay: true,
+      onTap: {
+        print("Today game tapped")
+      }
+    )
   }
   .padding()
 }

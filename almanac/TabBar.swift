@@ -18,6 +18,10 @@ struct TabBar: View {
   let progressManager: ProgressManager?
   let coordinator: GameCoordinator
   
+  // SwiftData queries to observe changes
+  @Query private var allCompletions: [DailyCompletion]
+  @Query private var allProgress: [GameProgress]
+  
   @State private var triggerHaptics: Bool = false
   @State private var availableGame: GameType?
   @State private var isDayComplete: Bool = false
@@ -72,6 +76,14 @@ struct TabBar: View {
       updateGameState()
     }
     .onChange(of: selectedGames) { _, _ in
+      updateGameState()
+    }
+    .onChange(of: allCompletions) { _, _ in
+      print("📥 Completions changed, updating game state...")
+      updateGameState()
+    }
+    .onChange(of: allProgress) { _, _ in
+      print("📊 Progress changed, updating game state...")
       updateGameState()
     }
   }
@@ -140,10 +152,17 @@ struct TabBar: View {
       return
     }
     
+    let dateString = DateFormatter.localizedString(from: selectedDate, dateStyle: .short, timeStyle: .none)
+    print("🔄 Updating game state for \(dateString) with \(selectedGames.count) selected games")
+    print("   🗓️ Selected date (full): \(selectedDate)")
+    print("   🗓️ Selected date (start of day): \(Calendar.current.startOfDay(for: selectedDate))")
+    
     // Check completion status for selected games
     let completedGames = selectedGames.filter { gameType in
       isGameCompletedForDate(selectedDate, gameType: gameType)
     }
+    
+    print("📊 Completed games: \(completedGames.map { $0.displayName })")
     
     allGamesComplete = completedGames.count == selectedGames.count
     isDayComplete = completedGames.count > 0
@@ -151,33 +170,48 @@ struct TabBar: View {
     if !allGamesComplete {
       // Find first uncompleted game to suggest
       let uncompletedGames = selectedGames.subtracting(Set(completedGames))
-      availableGame = uncompletedGames.first ?? selectedGames.first
+      let sortedUncompletedGames = Array(uncompletedGames).sorted { $0.rawValue < $1.rawValue }
+      availableGame = sortedUncompletedGames.first
+      
+      if let nextGame = availableGame {
+        print("🎯 Next available game: \(nextGame.displayName)")
+      } else {
+        print("❌ No uncompleted games found")
+      }
     } else {
       availableGame = nil
+      print("✅ All games completed for this date")
     }
   }
   
   private func handlePlayButtonTap() {
-    guard !allGamesComplete else { return }
+    guard !allGamesComplete else { 
+      print("🚫 All games complete for \(selectedDate)")
+      return 
+    }
     
     // If no specific game available, show game selection
     guard let gameType = availableGame else {
+      print("🎮 No available game, showing selection for \(selectedDate)")
       coordinator.showGameSelection(for: selectedDate)
       return
     }
     
-    // Check if game is already completed for this date
+    // Double-check if game is already completed for this date
     if isGameCompletedForDate(selectedDate, gameType: gameType) {
-      // If this specific game is completed, find another or show selection
-      let uncompletedGames = selectedGames.filter { !isGameCompletedForDate(selectedDate, gameType: $0) }
+      print("⚠️ Game \(gameType.displayName) already completed for \(selectedDate)")
+      // Force update game state to find next available game
+      updateGameState()
       
-      if let nextGame = uncompletedGames.first {
+      // Try again with updated state
+      if let nextGame = availableGame, !isGameCompletedForDate(selectedDate, gameType: nextGame) {
         startGame(gameType: nextGame)
       } else {
         coordinator.showGameSelection(for: selectedDate)
       }
     } else {
       // Start the suggested game
+      print("🎯 Starting \(gameType.displayName) for \(selectedDate)")
       startGame(gameType: gameType)
     }
     
@@ -185,26 +219,69 @@ struct TabBar: View {
   }
   
   private func startGame(gameType: GameType) {
+    // Prevent playing games in the future
+    let today = Calendar.current.startOfDay(for: Date())
+    let selectedDay = Calendar.current.startOfDay(for: selectedDate)
+    
+    guard selectedDay <= today else {
+      print("🚫 Cannot play games in the future")
+      return
+    }
+    
     guard let level = levelManager.getLevelForDate(selectedDate, gameType: gameType) else {
       print("❌ No level available for \(gameType.displayName) on \(selectedDate)")
       return
     }
     
     let context: GameSession.GameContext
-    let today = Calendar.current.startOfDay(for: Date())
-    let selectedDay = Calendar.current.startOfDay(for: selectedDate)
     
     if selectedDay == today {
       context = .daily(selectedDate)
+      
+      // Final safety check: prevent starting completed daily games
+      if isGameCompletedForDate(selectedDate, gameType: gameType) {
+        print("🚫 Preventing launch of completed daily game: \(gameType.displayName)")
+        coordinator.showGameSelection(for: selectedDate)
+        return
+      }
     } else {
-      context = .practice // Past/future dates are practice mode
+      context = .practice // Past dates are practice mode
     }
     
+    print("🚀 Launching \(gameType.displayName) in \(context.displayName) mode")
     coordinator.startGame(gameType: gameType, level: level, context: context)
   }
   
   private func isGameCompletedForDate(_ date: Date, gameType: GameType) -> Bool {
-    return progressManager?.hasCompletedDate(date, gameType: gameType) ?? false
+    // Use a consistent calendar for date operations
+    let calendar = Calendar.current
+    let startOfDay = calendar.startOfDay(for: date)
+    let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay)!
+    
+    let matchingCompletions = allCompletions.filter { completion in
+      let completionStartOfDay = calendar.startOfDay(for: completion.date)
+      return completion.gameType == gameType && completionStartOfDay == startOfDay
+    }
+    
+    let isCompleted = !matchingCompletions.isEmpty
+    
+    let dateString = DateFormatter.localizedString(from: date, dateStyle: .short, timeStyle: .none)
+    print("🔍 Checking \(gameType.displayName) for \(dateString):")
+    print("   📅 Target date (start of day): \(startOfDay)")
+    print("   📊 Total completions in DB: \(allCompletions.count)")
+    print("   🎯 Matching completions: \(matchingCompletions.count)")
+    
+    // Debug all completions for this game
+    let gameCompletions = allCompletions.filter { $0.gameType == gameType }
+    for completion in gameCompletions {
+      let completionStartOfDay = calendar.startOfDay(for: completion.date)
+      let matches = completionStartOfDay == startOfDay
+      print("   📝 Completion: \(completion.date) (start: \(completionStartOfDay)) -> \(matches ? "✅ MATCH" : "❌ no match")")
+    }
+    
+    print("   📝 Result: \(isCompleted ? "✅ Completed" : "❌ Not completed")")
+    
+    return isCompleted
   }
 }
 

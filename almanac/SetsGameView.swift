@@ -218,10 +218,15 @@ struct SetsGameView: View {
   }
 
   private var controlsView: some View {
-    HStack(spacing: 20) {
-      Button {
-        viewModel.shuffleCards()
-      } label: {
+    VStack(spacing: 12) {
+      // Debug button
+      DebugCompleteButton(session: viewModel.session, label: "Force Win")
+        .disabled(viewModel.session.isCompleted)
+      
+      HStack(spacing: 20) {
+        Button {
+          viewModel.shuffleCards()
+        } label: {
         HStack(spacing: 6) {
           Image(systemName: "shuffle")
           Text("Shuffle")
@@ -263,6 +268,7 @@ struct SetsGameView: View {
       }
       .sensoryFeedback(.impact(weight: .light), trigger: viewModel.game.hintCards.count)
       .disabled(!viewModel.canUseHint)
+      }
     }
   }
 

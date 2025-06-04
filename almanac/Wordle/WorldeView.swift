@@ -48,6 +48,11 @@ struct WordleGameView: View {
                     
                     Spacer()
                     
+                    // Debug button
+                    DebugCompleteButton(session: session, label: "Force Win")
+                        .disabled(session.isCompleted)
+                        .padding(.bottom, 8)
+                    
                     keyboardView
                         .frame(maxWidth: min(geometry.size.width - 32, 400)) // Limit keyboard width
                 }

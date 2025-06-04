@@ -232,7 +232,8 @@ struct CalendarView: View {
               isSelected: calendar.isDate(day.date, inSameDayAs: selectedDate),
               completionStatus: getFilteredDayCompletionStatus(day.date),
               selectedGamesColors: selectedGames.colors,
-              isCompact: true
+              isCompact: true,
+              canPlay: canPlayGame(for: day.date)
             ) {
               selectDate(day.date)
             }
@@ -262,7 +263,8 @@ struct CalendarView: View {
           isSelected: calendar.isDate(day.date, inSameDayAs: selectedDate),
           completionStatus: getFilteredDayCompletionStatus(day.date),
           selectedGamesColors: selectedGames.colors,
-          isCompact: false
+          isCompact: false,
+          canPlay: canPlayGame(for: day.date)
         ) {
           selectDate(day.date)
         }
@@ -276,9 +278,29 @@ struct CalendarView: View {
   private var selectedDateSection: some View {
     VStack(spacing: 20) {
       HStack {
-        Text(selectedDateTitle)
-          .font(.title2)
-          .fontWeight(.medium)
+        VStack(alignment: .leading, spacing: 4) {
+          HStack(spacing: 8) {
+            Text(selectedDateTitle)
+              .font(.title2)
+              .fontWeight(.medium)
+            
+            if calendar.isDateInToday(selectedDate) {
+              Image(systemName: "sun.max.fill")
+                .font(.caption)
+                .foregroundStyle(.orange)
+            }
+          }
+          
+          if !canPlayGame(for: selectedDate) {
+            Text("Jeux non disponibles dans le futur")
+              .font(.caption)
+              .foregroundStyle(.orange)
+          } else if !calendar.isDateInToday(selectedDate) {
+            Text("Mode pratique")
+              .font(.caption)
+              .foregroundStyle(.secondary)
+          }
+        }
 
         Spacer()
 
@@ -339,22 +361,44 @@ struct CalendarView: View {
         //  LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 16), count: 2), spacing: 16)
         LazyVStack {
           ForEach(Array(selectedGames).sorted(by: { $0.rawValue < $1.rawValue }), id: \.self) { gameType in
-            GameDayCard(
-              gameType: gameType,
-              date: selectedDate,
-              level: levelManager.getLevelForDate(selectedDate, gameType: gameType),
-              isCompleted: isGameCompletedForDate(selectedDate, gameType: gameType),
-              progress: getGameProgress(gameType),
-              onTap: {
-                if let level = levelManager.getLevelForDate(selectedDate, gameType: gameType) {
-                  coordinator.startGame(
-                    gameType: gameType,
-                    level: level,
-                    context: .daily(selectedDate)
-                  )
+            VStack(spacing: 8) {
+              GameDayCard(
+                gameType: gameType,
+                date: selectedDate,
+                level: levelManager.getLevelForDate(selectedDate, gameType: gameType),
+                isCompleted: isGameCompletedForDate(selectedDate, gameType: gameType),
+                progress: getGameProgress(gameType),
+                canPlay: canPlayGame(for: selectedDate),
+                onTap: {
+                  guard canPlayGame(for: selectedDate) else {
+                    print("🚫 Cannot play games in the future")
+                    return
+                  }
+                  
+                  if let level = levelManager.getLevelForDate(selectedDate, gameType: gameType) {
+                    let context = getGameContext(for: selectedDate)
+                    coordinator.startGame(
+                      gameType: gameType,
+                      level: level,
+                      context: context
+                    )
+                  }
                 }
+              )
+              
+              // Debug completion button
+              if !isGameCompletedForDate(selectedDate, gameType: gameType) && canPlayGame(for: selectedDate) {
+                Button("🚀 DEBUG: Complete \(gameType.displayName)") {
+                  debugCompleteGame(gameType: gameType, date: selectedDate)
+                }
+                .font(.caption2)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(.red.opacity(0.2))
+                .foregroundStyle(.red)
+                .cornerRadius(6)
               }
-            )
+            }
           }
         }
       }
@@ -606,7 +650,17 @@ struct CalendarView: View {
       .environment(\.modelContext, modelContext)
       .onChange(of: session.isCompleted) { _, isCompleted in
         if isCompleted {
-          progressManager?.recordCompletion(session: session)
+          print("🎯 Session completed: \(session.gameType.displayName)")
+          print("   📅 Context: \(session.context)")
+          print("   ⏱️ Play time: \(session.actualPlayTime)")
+          
+          if let progressManager = progressManager {
+            print("   💾 Recording completion...")
+            progressManager.recordCompletion(session: session)
+            print("   ✅ Completion recorded")
+          } else {
+            print("   ❌ ProgressManager is nil!")
+          }
         }
       }
     }
@@ -663,6 +717,8 @@ struct CalendarView: View {
 
     return daysInMonth.compactMap { dayNumber in
       if let date = calendar.date(byAdding: .day, value: dayNumber - 1, to: monthInterval.start) {
+        // Only show dates up to one week after today
+        guard shouldShowDate(date) else { return nil }
         return CalendarDay(date: date, dayNumber: dayNumber, isCurrentMonth: true)
       }
       return nil
@@ -685,11 +741,65 @@ struct CalendarView: View {
     // Add days of the month
     for day in 1...daysInMonth {
       if let date = calendar.date(byAdding: .day, value: day - 1, to: startOfMonth) {
-        days.append(CalendarDay(date: date, dayNumber: day, isCurrentMonth: true))
+        // Only show dates up to one week after today, but show past dates
+        if shouldShowDate(date) {
+          days.append(CalendarDay(date: date, dayNumber: day, isCurrentMonth: true))
+        }
       }
     }
 
     return days
+  }
+
+  // MARK: - Game Context Helper
+  
+  private func getGameContext(for date: Date) -> GameSession.GameContext {
+    let today = Calendar.current.startOfDay(for: Date())
+    let selectedDay = Calendar.current.startOfDay(for: date)
+    
+    // Allow daily completions for today and past dates
+    if selectedDay <= today {
+      return .daily(date)
+    } else {
+      return .practice // Only future dates are practice mode
+    }
+  }
+  
+  private func canPlayGame(for date: Date) -> Bool {
+    let today = Calendar.current.startOfDay(for: Date())
+    let selectedDay = Calendar.current.startOfDay(for: date)
+    
+    // Can play today and past dates, but not future dates
+    return selectedDay <= today
+  }
+  
+  private func shouldShowDate(_ date: Date) -> Bool {
+    let today = Calendar.current.startOfDay(for: Date())
+    let targetDate = Calendar.current.startOfDay(for: date)
+    let weekAfterToday = Calendar.current.date(byAdding: .day, value: 7, to: today)!
+    
+    // Show only dates up to one week after today
+    return targetDate <= weekAfterToday
+  }
+
+  // MARK: - Debug Helper
+  
+  private func debugCompleteGame(gameType: GameType, date: Date) {
+    guard let level = levelManager.getLevelForDate(date, gameType: gameType),
+          let progressManager = progressManager else {
+      print("❌ Could not create debug completion")
+      return
+    }
+    
+    let context = getGameContext(for: date)
+    let mockSession = GameSession(gameType: gameType, level: level, context: context)
+    
+    // Simulate a quick completion
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+      mockSession.complete()
+      progressManager.recordCompletion(session: mockSession)
+      print("🔧 DEBUG: Force completed \(gameType.displayName) for \(date)")
+    }
   }
 
   // MARK: - SwiftData Helper Methods

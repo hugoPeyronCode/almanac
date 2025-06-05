@@ -90,24 +90,55 @@ class StatisticsManager {
     // MARK: - Individual Game Streaks
     
     func calculateCurrentStreak(for gameType: GameType) -> Int {
-        let today = Date()
-        var streakCount = 0
-        var checkDate = today
+        print("🔍 Calculating current streak for \(gameType.displayName)")
         
-        // Check if today is completed first
-        if !hasCompletedDate(checkDate, gameType: gameType) {
-            // If today isn't completed, check yesterday
-            guard let yesterday = calendar.date(byAdding: .day, value: -1, to: checkDate) else { return 0 }
-            checkDate = yesterday
+        // Get all completions for this game type and find the most recent date
+        let completions = getAllCompletions(for: gameType)
+        guard !completions.isEmpty else {
+            print("   ❌ No completions found, returning 0")
+            return 0
         }
         
-        // Count consecutive completed days backwards
+        // Group completions by date and get unique dates
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+        
+        let completedDates = Set(completions.map { completion in
+            dateFormatter.string(from: calendar.startOfDay(for: completion.date))
+        })
+        
+        let sortedDates = completedDates.sorted(by: >)  // Most recent first
+        print("   📅 Completed dates: \(sortedDates)")
+        
+        guard let mostRecentDateString = sortedDates.first,
+              let mostRecentDate = dateFormatter.date(from: mostRecentDateString) else {
+            print("   ❌ Can't parse most recent date")
+            return 0
+        }
+        
+        let today = calendar.startOfDay(for: Date())
+        print("   📅 Most recent completion: \(mostRecentDate)")
+        print("   📅 Today: \(today)")
+        
+        // If most recent completion is more than 1 day ago from today, streak is broken
+        let daysBetween = calendar.dateComponents([.day], from: mostRecentDate, to: today).day ?? 0
+        if daysBetween > 1 {
+            print("   💔 Streak broken - \(daysBetween) days gap")
+            return 0
+        }
+        
+        // Count consecutive days backwards from most recent completion
+        var streakCount = 0
+        var checkDate = mostRecentDate
+        
         while hasCompletedDate(checkDate, gameType: gameType) {
             streakCount += 1
+            print("   🔥 Streak count: \(streakCount) (date: \(checkDate))")
             guard let previousDay = calendar.date(byAdding: .day, value: -1, to: checkDate) else { break }
             checkDate = previousDay
         }
         
+        print("   🏁 Final streak: \(streakCount)")
         return streakCount
     }
     
@@ -309,7 +340,11 @@ class StatisticsManager {
         )
         
         let completions = (try? modelContext.fetch(fetchDescriptor)) ?? []
-        return !completions.isEmpty
+        let hasCompleted = !completions.isEmpty
+        
+        print("   🔍 Checking \(gameType.displayName) for \(startOfDay): \(hasCompleted ? "✅" : "❌") (\(completions.count) completions)")
+        
+        return hasCompleted
     }
     
     private func getCompletions(for gameType: GameType, from startDate: Date, to endDate: Date) -> [DailyCompletion] {

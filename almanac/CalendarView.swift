@@ -104,6 +104,9 @@ struct CalendarView: View {
       // Load selected games from UserDefaults on first appearance
       loadSelectedGamesFromUserDefaults()
     }
+    .onChange(of: allCompletions.count) { _, newCount in
+      print("📥 CalendarView: Completions count changed to \(newCount)")
+    }
   }
 
   // MARK: - Header
@@ -243,13 +246,36 @@ struct CalendarView: View {
         .padding(.horizontal)
       }
       .onAppear {
+        let today = Date()
         withAnimation(.easeInOut(duration: 0.5)) {
-          proxy.scrollTo(Date(), anchor: .center)
+          proxy.scrollTo(today, anchor: UnitPoint.center)
         }
       }
       .onChange(of: selectedDate) { _, newDate in
         withAnimation(.easeInOut(duration: 0.3)) {
-          proxy.scrollTo(newDate, anchor: .center)
+          proxy.scrollTo(newDate, anchor: UnitPoint.center)
+        }
+      }
+      .onChange(of: currentMonth) { _, _ in
+        // When month changes, scroll to today if it's in the current month, otherwise to the 15th
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+          let today = Date()
+          let currentMonthStart = calendar.dateInterval(of: .month, for: currentMonth)?.start ?? currentMonth
+          
+          // Check if today is in the current month being displayed
+          if calendar.isDate(today, equalTo: currentMonth, toGranularity: .month) {
+            // Today is in current month, scroll to today
+            withAnimation(.easeInOut(duration: 0.4)) {
+              proxy.scrollTo(today, anchor: UnitPoint.center)
+            }
+          } else {
+            // Today is not in current month, scroll to middle of month (15th)
+            if let fifteenth = calendar.date(byAdding: .day, value: 14, to: currentMonthStart) {
+              withAnimation(.easeInOut(duration: 0.4)) {
+                proxy.scrollTo(fifteenth, anchor: UnitPoint.center)
+              }
+            }
+          }
         }
       }
     }
@@ -413,7 +439,9 @@ struct CalendarView: View {
       if !selectedGames.isEmpty {
         StreakDisplayView(
           selectedGames: selectedGames,
-          progressManager: progressManager
+          progressManager: progressManager,
+          individualStreaks: getIndividualStreaks(),
+          allGamesStreak: getAllGamesStreakLocal()
         )
         .padding(.horizontal)
       }
@@ -558,17 +586,27 @@ struct CalendarView: View {
   }
 
   private func getFilteredCurrentStreak() -> Int {
-    return allProgress
-      .filter { selectedGames.contains($0.gameType) }
-      .map(\.currentStreak)
-      .max() ?? 0
+    let streaks = selectedGames.compactMap { gameType in
+      let streak = calculateCurrentStreakLocal(for: gameType)
+      print("📊 CalendarView current streak for \(gameType.displayName): \(streak)")
+      return streak
+    }
+    
+    let maxStreak = streaks.max() ?? 0
+    print("📊 CalendarView max current streak: \(maxStreak)")
+    return maxStreak
   }
 
   private func getFilteredMaxStreak() -> Int {
-    return allProgress
-      .filter { selectedGames.contains($0.gameType) }
-      .map(\.maxStreak)
-      .max() ?? 0
+    let streaks = selectedGames.compactMap { gameType in
+      let streak = calculateMaxStreakLocal(for: gameType)
+      print("📊 CalendarView max streak for \(gameType.displayName): \(streak)")
+      return streak
+    }
+    
+    let maxStreak = streaks.max() ?? 0
+    print("📊 CalendarView overall max streak: \(maxStreak)")
+    return maxStreak
   }
 
   private func getFilteredPerfectDaysCount() -> Int {
@@ -802,6 +840,116 @@ struct CalendarView: View {
     }
   }
 
+  // MARK: - Local Streak Calculations (using @Query data directly)
+  
+  private func calculateCurrentStreakLocal(for gameType: GameType) -> Int {
+    print("🔍 CalendarView calculating current streak for \(gameType.displayName)")
+    
+    // Get completions for this game type from our @Query data
+    let gameCompletions = allCompletions.filter { $0.gameType == gameType }
+    
+    guard !gameCompletions.isEmpty else {
+      print("   ❌ No completions found in @Query data")
+      return 0
+    }
+    
+    print("   📊 Found \(gameCompletions.count) completions in @Query data")
+    
+    // Group completions by date and get unique dates
+    let dateFormatter = DateFormatter()
+    dateFormatter.dateFormat = "yyyy-MM-dd"
+    
+    let completedDates = Set(gameCompletions.map { completion in
+      dateFormatter.string(from: calendar.startOfDay(for: completion.date))
+    })
+    
+    let sortedDates = completedDates.sorted(by: >)  // Most recent first
+    print("   📅 Completed dates: \(sortedDates)")
+    
+    guard let mostRecentDateString = sortedDates.first,
+          let mostRecentDate = dateFormatter.date(from: mostRecentDateString) else {
+      print("   ❌ Can't parse most recent date")
+      return 0
+    }
+    
+    let today = calendar.startOfDay(for: Date())
+    print("   📅 Most recent completion: \(mostRecentDate)")
+    print("   📅 Today: \(today)")
+    
+    // If most recent completion is more than 1 day ago from today, streak is broken
+    let daysBetween = calendar.dateComponents([.day], from: mostRecentDate, to: today).day ?? 0
+    if daysBetween > 1 {
+      print("   💔 Streak broken - \(daysBetween) days gap")
+      return 0
+    }
+    
+    // Count consecutive days backwards from most recent completion
+    var streakCount = 0
+    var checkDate = mostRecentDate
+    
+    while hasCompletedDateLocal(checkDate, gameType: gameType) {
+      streakCount += 1
+      print("   🔥 Streak count: \(streakCount) (date: \(checkDate))")
+      guard let previousDay = calendar.date(byAdding: .day, value: -1, to: checkDate) else { break }
+      checkDate = previousDay
+    }
+    
+    print("   🏁 Final streak: \(streakCount)")
+    return streakCount
+  }
+  
+  private func calculateMaxStreakLocal(for gameType: GameType) -> Int {
+    let gameCompletions = allCompletions.filter { $0.gameType == gameType }
+    guard !gameCompletions.isEmpty else { return 0 }
+    
+    // Group completions by date
+    let dateFormatter = DateFormatter()
+    dateFormatter.dateFormat = "yyyy-MM-dd"
+    
+    var completedDates = Set<String>()
+    for completion in gameCompletions {
+      let dateString = dateFormatter.string(from: completion.date)
+      completedDates.insert(dateString)
+    }
+    
+    // Sort dates and find longest consecutive sequence
+    let sortedDates = completedDates.sorted()
+    var maxStreak = 0
+    var currentStreak = 0
+    var lastDate: Date?
+    
+    for dateString in sortedDates {
+      guard let date = dateFormatter.date(from: dateString) else { continue }
+      
+      if let last = lastDate,
+         let daysDiff = calendar.dateComponents([.day], from: last, to: date).day,
+         daysDiff == 1 {
+        currentStreak += 1
+      } else {
+        currentStreak = 1
+      }
+      
+      maxStreak = max(maxStreak, currentStreak)
+      lastDate = date
+    }
+    
+    return maxStreak
+  }
+  
+  private func hasCompletedDateLocal(_ date: Date, gameType: GameType) -> Bool {
+    let startOfDay = calendar.startOfDay(for: date)
+    let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay)!
+    
+    let hasCompleted = allCompletions.contains { completion in
+      completion.gameType == gameType &&
+      completion.date >= startOfDay &&
+      completion.date < endOfDay
+    }
+    
+    print("   🔍 Local check \(gameType.displayName) for \(startOfDay): \(hasCompleted ? "✅" : "❌")")
+    return hasCompleted
+  }
+
   // MARK: - SwiftData Helper Methods
 
   private func isGameCompletedForDate(_ date: Date, gameType: GameType) -> Bool {
@@ -817,6 +965,108 @@ struct CalendarView: View {
 
   private func getGameProgress(_ gameType: GameType) -> GameProgress? {
     return allProgress.first { $0.gameType == gameType }
+  }
+  
+  // MARK: - Streak Data for StreakDisplayView
+  
+  private func getIndividualStreaks() -> [GameType: (current: Int, max: Int)] {
+    var streaks: [GameType: (current: Int, max: Int)] = [:]
+    
+    for gameType in selectedGames {
+      let current = calculateCurrentStreakLocal(for: gameType)
+      let max = calculateMaxStreakLocal(for: gameType)
+      streaks[gameType] = (current, max)
+    }
+    
+    return streaks
+  }
+  
+  private func getAllGamesStreakLocal() -> (current: Int, max: Int) {
+    guard !selectedGames.isEmpty else { return (0, 0) }
+    
+    // For all-games streak, we need to find consecutive days where ALL selected games were completed
+    let today = calendar.startOfDay(for: Date())
+    
+    // Get all unique completion dates
+    let allDates = Set(allCompletions.map { calendar.startOfDay(for: $0.date) })
+    let sortedDates = allDates.sorted(by: >)  // Most recent first
+    
+    // Find most recent date where all games were completed
+    var mostRecentAllComplete: Date?
+    
+    for date in sortedDates {
+      let completedGamesForDate = selectedGames.filter { gameType in
+        hasCompletedDateLocal(date, gameType: gameType)
+      }
+      
+      if completedGamesForDate.count == selectedGames.count {
+        mostRecentAllComplete = date
+        break
+      }
+    }
+    
+    guard let startDate = mostRecentAllComplete else {
+      return (0, calculateMaxAllGamesStreakLocal())
+    }
+    
+    // Check if there's a gap of more than 1 day
+    let daysBetween = calendar.dateComponents([.day], from: startDate, to: today).day ?? 0
+    if daysBetween > 1 {
+      return (0, calculateMaxAllGamesStreakLocal())
+    }
+    
+    // Count consecutive days where all games were completed
+    var currentStreak = 0
+    var checkDate = startDate
+    
+    while areAllGamesCompletedLocal(on: checkDate) {
+      currentStreak += 1
+      guard let previousDay = calendar.date(byAdding: .day, value: -1, to: checkDate) else { break }
+      checkDate = previousDay
+    }
+    
+    return (currentStreak, calculateMaxAllGamesStreakLocal())
+  }
+  
+  private func areAllGamesCompletedLocal(on date: Date) -> Bool {
+    for gameType in selectedGames {
+      if !hasCompletedDateLocal(date, gameType: gameType) {
+        return false
+      }
+    }
+    return true
+  }
+  
+  private func calculateMaxAllGamesStreakLocal() -> Int {
+    guard !selectedGames.isEmpty else { return 0 }
+    
+    let allDates = Set(allCompletions.map { calendar.startOfDay(for: $0.date) })
+    let sortedDates = allDates.sorted()
+    
+    var maxStreak = 0
+    var currentStreak = 0
+    var lastDate: Date?
+    
+    for date in sortedDates {
+      // Check if all games completed on this date
+      if areAllGamesCompletedLocal(on: date) {
+        if let last = lastDate,
+           let daysDiff = calendar.dateComponents([.day], from: last, to: date).day,
+           daysDiff == 1 {
+          currentStreak += 1
+        } else {
+          currentStreak = 1
+        }
+        
+        maxStreak = max(maxStreak, currentStreak)
+        lastDate = date
+      } else {
+        currentStreak = 0
+        lastDate = nil
+      }
+    }
+    
+    return maxStreak
   }
 }
 

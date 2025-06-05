@@ -25,17 +25,20 @@ struct CalendarDayView: View {
   private var dayState: DayState {
     if !day.isCurrentMonth && !isCompact { return .inactive }
     if !canPlay { return .disabled }
-    if isToday { return .today }
 
     switch completionStatus {
-    case .none: return .hasLevels
-    case .partiallyCompleted: return .partiallyCompleted
-    case .allCompleted: return .allCompleted
+    case .none: 
+      return isToday ? .today : .hasLevels
+    case .partiallyCompleted: 
+      return isToday ? .todayPartiallyCompleted : .partiallyCompleted
+    case .allCompleted: 
+      return isToday ? .todayAllCompleted : .allCompleted
     }
   }
 
   enum DayState {
     case inactive, hasLevels, partiallyCompleted, allCompleted, today, disabled
+    case todayPartiallyCompleted, todayAllCompleted
   }
 
   var body: some View {
@@ -56,15 +59,16 @@ struct CalendarDayView: View {
     VStack(spacing: 8) {
       ZStack {
         Circle()
-          .fill(.thinMaterial)
+          .fill(isToday ? .ultraThinMaterial : .thinMaterial)
           .frame(width: 36, height: 36)
           .overlay(
             Circle()
               .stroke(isSelected ? Color.primary : Color.clear, lineWidth: 2)
           )
           .overlay(progressRing)
+          .overlay(todayHighlight)
 
-        if dayState == .allCompleted {
+        if dayState == .allCompleted || dayState == .todayAllCompleted {
           Image(systemName: "checkmark")
             .font(.caption)
             .fontWeight(.bold)
@@ -87,19 +91,20 @@ struct CalendarDayView: View {
     VStack(spacing: 4) {
       ZStack {
         Circle()
-          .foregroundStyle(.thinMaterial)
+          .foregroundStyle(isToday ? .ultraThinMaterial : .thinMaterial)
           .frame(width: 44, height: 44)
           .overlay(progressRing)
           .overlay(selectionHighlight)
+          .overlay(todayHighlight)
 
-        if dayState == .allCompleted {
+        if dayState == .allCompleted || dayState == .todayAllCompleted {
           Image(systemName: "checkmark")
             .font(.title3)
             .fontWeight(.bold)
             .foregroundStyle(.primary)
         } else if day.isCurrentMonth {
           Text("\(day.dayNumber)")
-            .font(.system(size: 16, weight: dayState == .today ? .bold : .medium))
+            .font(.system(size: 16, weight: dayState == .today || dayState == .todayPartiallyCompleted ? .bold : .medium))
             .foregroundStyle(dayState == .inactive ? . clear : .primary)
         }
       }
@@ -118,13 +123,12 @@ struct CalendarDayView: View {
               .stroke(
                 LinearGradient(
                   colors: selectedGamesColors,
-                  startPoint: .topLeading,
-                  endPoint: .bottomTrailing
+                  startPoint: UnitPoint.topLeading,
+                  endPoint: UnitPoint.bottomTrailing
                 ),
                 style: StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round)
               )
-              .rotationEffect(.degrees(-90))
-              .animation(.easeInOut(duration: 0.5), value: progress)
+              .rotationEffect(Angle.degrees(-90))
           .frame(width: isCompact ? 40 : 48, height: isCompact ? 40 : 48)
       }
     }
@@ -159,14 +163,32 @@ struct CalendarDayView: View {
         Circle()
           .stroke(
             LinearGradient(
-              colors: [.primary],
-              startPoint: .top,
-              endPoint: .bottom
+              colors: [Color.primary],
+              startPoint: UnitPoint.top,
+              endPoint: UnitPoint.bottom
             ),
             lineWidth: 3
           )
           .frame(width: 48, height: 48)
-          .shadow(color: .blue.opacity(0.3), radius: 4)
+          .shadow(color: Color.blue.opacity(0.3), radius: 4)
+      }
+    }
+  }
+  
+  private var todayHighlight: some View {
+    Group {
+      if isToday {
+        Circle()
+          .stroke(
+            LinearGradient(
+              colors: [Color.orange, Color.yellow],
+              startPoint: UnitPoint.topLeading,
+              endPoint: UnitPoint.bottomTrailing
+            ),
+            lineWidth: 2
+          )
+          .frame(width: isCompact ? 40 : 48, height: isCompact ? 40 : 48)
+          .shadow(color: Color.orange.opacity(0.4), radius: 3)
       }
     }
   }

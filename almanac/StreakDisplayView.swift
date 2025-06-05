@@ -11,9 +11,24 @@ import SwiftData
 struct StreakDisplayView: View {
     let selectedGames: Set<GameType>
     let progressManager: ProgressManager?
+    let individualStreaks: [GameType: (current: Int, max: Int)]?
+    let allGamesStreak: (current: Int, max: Int)?
     
-    @State private var allGamesStreak: (current: Int, max: Int) = (0, 0)
-    @State private var individualStreaks: [GameType: (current: Int, max: Int)] = [:]
+    // Observe changes to force updates
+    @Query private var allCompletions: [DailyCompletion]
+    @Query private var allProgress: [GameProgress]
+    
+    @State private var calculatedAllGamesStreak: (current: Int, max: Int) = (0, 0)
+    @State private var calculatedIndividualStreaks: [GameType: (current: Int, max: Int)] = [:]
+    
+    // Computed properties to use either passed data or calculated data
+    private var displayAllGamesStreak: (current: Int, max: Int) {
+        return allGamesStreak ?? calculatedAllGamesStreak
+    }
+    
+    private var displayIndividualStreaks: [GameType: (current: Int, max: Int)] {
+        return individualStreaks ?? calculatedIndividualStreaks
+    }
     
     var body: some View {
         VStack(spacing: 16) {
@@ -26,10 +41,24 @@ struct StreakDisplayView: View {
             individualStreaksView
         }
         .onAppear {
-            updateStreaks()
+            if individualStreaks == nil || allGamesStreak == nil {
+                updateStreaks()
+            }
         }
         .onChange(of: selectedGames) { _, _ in
-            updateStreaks()
+            if individualStreaks == nil || allGamesStreak == nil {
+                updateStreaks()
+            }
+        }
+        .onChange(of: allCompletions.count) { _, _ in
+            if individualStreaks == nil || allGamesStreak == nil {
+                updateStreaks()
+            }
+        }
+        .onChange(of: allProgress.count) { _, _ in
+            if individualStreaks == nil || allGamesStreak == nil {
+                updateStreaks()
+            }
         }
     }
     
@@ -49,13 +78,13 @@ struct StreakDisplayView: View {
             HStack(spacing: 24) {
                 StreakItemView(
                     title: "Actuelle",
-                    value: allGamesStreak.current,
+                    value: displayAllGamesStreak.current,
                     color: .green
                 )
                 
                 StreakItemView(
                     title: "Record",
-                    value: allGamesStreak.max,
+                    value: displayAllGamesStreak.max,
                     color: .orange
                 )
                 
@@ -83,7 +112,7 @@ struct StreakDisplayView: View {
                 ForEach(Array(selectedGames), id: \.self) { gameType in
                     GameStreakCard(
                         gameType: gameType,
-                        streak: individualStreaks[gameType] ?? (0, 0)
+                        streak: displayIndividualStreaks[gameType] ?? (0, 0)
                     )
                 }
             }
@@ -97,17 +126,21 @@ struct StreakDisplayView: View {
     private func updateStreaks() {
         guard let manager = progressManager else { return }
         
-        // Update all games streak
-        allGamesStreak = manager.statistics.calculateAllGamesStreak(for: selectedGames)
+        print("🔄 Updating streaks in StreakDisplayView for \(selectedGames.count) games (fallback mode)")
         
-        // Update individual streaks
+        // Update all games streak (fallback when no data passed)
+        calculatedAllGamesStreak = manager.statistics.calculateAllGamesStreak(for: selectedGames)
+        print("   📊 All games streak: current=\(calculatedAllGamesStreak.current), max=\(calculatedAllGamesStreak.max)")
+        
+        // Update individual streaks (fallback when no data passed)
         var newIndividualStreaks: [GameType: (current: Int, max: Int)] = [:]
         for gameType in selectedGames {
             let current = manager.statistics.calculateCurrentStreak(for: gameType)
             let max = manager.statistics.calculateMaxStreak(for: gameType)
             newIndividualStreaks[gameType] = (current, max)
+            print("   🎮 \(gameType.displayName): current=\(current), max=\(max)")
         }
-        individualStreaks = newIndividualStreaks
+        calculatedIndividualStreaks = newIndividualStreaks
     }
 }
 
@@ -193,7 +226,9 @@ struct GameStreakCard: View {
     
     return StreakDisplayView(
         selectedGames: Set([.wordle, .shikaku, .sets]),
-        progressManager: ProgressManager(modelContext: container.mainContext)
+        progressManager: ProgressManager(modelContext: container.mainContext),
+        individualStreaks: nil,
+        allGamesStreak: nil
     )
     .padding()
     .modelContainer(container)

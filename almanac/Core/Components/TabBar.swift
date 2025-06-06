@@ -75,17 +75,6 @@ struct TabBar: View {
     .onChange(of: selectedDate) { _, _ in
       updateGameState()
     }
-    .onChange(of: selectedGames) { _, _ in
-      updateGameState()
-    }
-    .onChange(of: allCompletions) { _, _ in
-      print("📥 Completions changed, updating game state...")
-      updateGameState()
-    }
-    .onChange(of: allProgress) { _, _ in
-      print("📊 Progress changed, updating game state...")
-      updateGameState()
-    }
   }
   
   // MARK: - Play Button Content
@@ -245,7 +234,7 @@ struct TabBar: View {
         return
       }
     } else {
-      context = .practice // Past dates are practice mode
+      context = .practice() // Past dates are practice mode
     }
     
     print("🚀 Launching \(gameType.displayName) in \(context.displayName) mode")

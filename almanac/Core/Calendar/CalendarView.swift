@@ -57,7 +57,9 @@ struct CalendarView: View {
 
           TabBar(
             leftButtonAction: { coordinator.showStatistics() },
-            rightButtonAction: { coordinator.push(.practiceMode) },
+            rightButtonAction: { 
+              coordinator.showPractice()
+            },
             selectedDate: selectedDate,
             selectedGames: selectedGames,
             progressManager: progressManager,
@@ -105,7 +107,7 @@ struct CalendarView: View {
       loadSelectedGamesFromUserDefaults()
     }
     .onChange(of: allCompletions.count) { _, newCount in
-      print("📥 CalendarView: Completions count changed to \(newCount)")
+      // Completions count changed
     }
   }
 
@@ -118,15 +120,25 @@ struct CalendarView: View {
         .fontWeight(.black)
 
       Spacer()
+      
+      HStack(spacing: 16) {
+        Button {
+          coordinator.showProfile()
+        } label: {
+          Image(systemName: "person.circle.fill")
+            .font(.title2)
+            .foregroundStyle(Color.secondary)
+        }
 
-      Button {
-        withAnimation(.bouncy){
-        showingFilters.toggle()
-      }
-      } label: {
-        Image(systemName: showingFilters ? "line.3.horizontal.decrease.circle" : "line.3.horizontal.decrease.circle.fill")
-          .font(.title2)
-          .foregroundStyle(Color.secondary)
+        Button {
+          withAnimation(.bouncy){
+          showingFilters.toggle()
+        }
+        } label: {
+          Image(systemName: showingFilters ? "line.3.horizontal.decrease.circle" : "line.3.horizontal.decrease.circle.fill")
+            .font(.title2)
+            .foregroundStyle(Color.secondary)
+        }
       }
     }
     .padding(.horizontal)
@@ -397,7 +409,6 @@ struct CalendarView: View {
                 canPlay: canPlayGame(for: selectedDate),
                 onTap: {
                   guard canPlayGame(for: selectedDate) else {
-                    print("🚫 Cannot play games in the future")
                     return
                   }
                   
@@ -588,24 +599,20 @@ struct CalendarView: View {
   private func getFilteredCurrentStreak() -> Int {
     let streaks = selectedGames.compactMap { gameType in
       let streak = calculateCurrentStreakLocal(for: gameType)
-      print("📊 CalendarView current streak for \(gameType.displayName): \(streak)")
       return streak
     }
     
     let maxStreak = streaks.max() ?? 0
-    print("📊 CalendarView max current streak: \(maxStreak)")
     return maxStreak
   }
 
   private func getFilteredMaxStreak() -> Int {
     let streaks = selectedGames.compactMap { gameType in
       let streak = calculateMaxStreakLocal(for: gameType)
-      print("📊 CalendarView max streak for \(gameType.displayName): \(streak)")
       return streak
     }
     
     let maxStreak = streaks.max() ?? 0
-    print("📊 CalendarView overall max streak: \(maxStreak)")
     return maxStreak
   }
 
@@ -632,23 +639,15 @@ struct CalendarView: View {
     return perfectDays
   }
 
-  // MARK: - Navigation Content (Keep existing implementation)
 
+  // MARK: - Navigation Content
+  
   @ViewBuilder
   private func navigationContent(for destination: GameCoordinator.NavigationDestination) -> some View {
     switch destination {
-    case .practiceMode:
-      PracticeModeView()
-        .environment(coordinator)
-        .environment(\.modelContext, modelContext)
-        .navigationBarBackButtonHidden(true)
     case .gameSelection(let date):
       GameSelectionView(date: date)
         .environment(coordinator)
-    case .statistics:
-      StatisticsView()
-        .environment(coordinator)
-        .environment(\.modelContext, modelContext)
     }
   }
 
@@ -662,6 +661,13 @@ struct CalendarView: View {
       StatisticsView()
         .environment(coordinator)
         .environment(\.modelContext, modelContext)
+    case .practice:
+      PracticeModeView()
+        .environment(coordinator)
+        .environment(\.modelContext, modelContext)
+    case .profile:
+      ProfileView()
+        .environment(\.modelContext, modelContext)
     }
   }
 
@@ -671,33 +677,31 @@ struct CalendarView: View {
     case .gamePlay(let session):
       // Route to specific game view based on game type
       Group {
-        switch session.gameType {
-        case .pipe:
-          PipeGameView(session: session)
-        case .shikaku:
-          ShikakuGameView(session: session)
-        case .sets:
-          SetsGameView(session: session)
-        case .wordle:
-          WordleGameView(session: session)
-        default:
-          GamePlayView(session: session)
+        if case .practice = session.context {
+          // Use wrapper for practice sessions to handle level transitions
+          PracticeGameWrapper(session: session)
+        } else {
+          // Direct routing for non-practice sessions
+          switch session.gameType {
+          case .pipe:
+            PipeGameView(session: session)
+          case .shikaku:
+            ShikakuGameView(session: session)
+          case .sets:
+            SetsGameView(session: session)
+          case .wordle:
+            WordleGameView(session: session)
+          default:
+            GamePlayView(session: session)
+          }
         }
       }
       .environment(coordinator)
       .environment(\.modelContext, modelContext)
       .onChange(of: session.isCompleted) { _, isCompleted in
         if isCompleted {
-          print("🎯 Session completed: \(session.gameType.displayName)")
-          print("   📅 Context: \(session.context)")
-          print("   ⏱️ Play time: \(session.actualPlayTime)")
-          
           if let progressManager = progressManager {
-            print("   💾 Recording completion...")
             progressManager.recordCompletion(session: session)
-            print("   ✅ Completion recorded")
-          } else {
-            print("   ❌ ProgressManager is nil!")
           }
         }
       }
@@ -799,7 +803,7 @@ struct CalendarView: View {
     if selectedDay <= today {
       return .daily(date)
     } else {
-      return .practice // Only future dates are practice mode
+      return .practice() // Only future dates are practice mode
     }
   }
   
@@ -825,7 +829,6 @@ struct CalendarView: View {
   private func debugCompleteGame(gameType: GameType, date: Date) {
     guard let level = levelManager.getLevelForDate(date, gameType: gameType),
           let progressManager = progressManager else {
-      print("❌ Could not create debug completion")
       return
     }
     
@@ -836,24 +839,20 @@ struct CalendarView: View {
     DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
       mockSession.complete()
       progressManager.recordCompletion(session: mockSession)
-      print("🔧 DEBUG: Force completed \(gameType.displayName) for \(date)")
     }
   }
 
   // MARK: - Local Streak Calculations (using @Query data directly)
   
   private func calculateCurrentStreakLocal(for gameType: GameType) -> Int {
-    print("🔍 CalendarView calculating current streak for \(gameType.displayName)")
     
     // Get completions for this game type from our @Query data
     let gameCompletions = allCompletions.filter { $0.gameType == gameType }
     
     guard !gameCompletions.isEmpty else {
-      print("   ❌ No completions found in @Query data")
       return 0
     }
     
-    print("   📊 Found \(gameCompletions.count) completions in @Query data")
     
     // Group completions by date and get unique dates
     let dateFormatter = DateFormatter()
@@ -864,22 +863,17 @@ struct CalendarView: View {
     })
     
     let sortedDates = completedDates.sorted(by: >)  // Most recent first
-    print("   📅 Completed dates: \(sortedDates)")
     
     guard let mostRecentDateString = sortedDates.first,
           let mostRecentDate = dateFormatter.date(from: mostRecentDateString) else {
-      print("   ❌ Can't parse most recent date")
       return 0
     }
     
     let today = calendar.startOfDay(for: Date())
-    print("   📅 Most recent completion: \(mostRecentDate)")
-    print("   📅 Today: \(today)")
     
     // If most recent completion is more than 1 day ago from today, streak is broken
     let daysBetween = calendar.dateComponents([.day], from: mostRecentDate, to: today).day ?? 0
     if daysBetween > 1 {
-      print("   💔 Streak broken - \(daysBetween) days gap")
       return 0
     }
     
@@ -889,12 +883,10 @@ struct CalendarView: View {
     
     while hasCompletedDateLocal(checkDate, gameType: gameType) {
       streakCount += 1
-      print("   🔥 Streak count: \(streakCount) (date: \(checkDate))")
       guard let previousDay = calendar.date(byAdding: .day, value: -1, to: checkDate) else { break }
       checkDate = previousDay
     }
     
-    print("   🏁 Final streak: \(streakCount)")
     return streakCount
   }
   
@@ -946,7 +938,6 @@ struct CalendarView: View {
       completion.date < endOfDay
     }
     
-    print("   🔍 Local check \(gameType.displayName) for \(startOfDay): \(hasCompleted ? "✅" : "❌")")
     return hasCompleted
   }
 
@@ -1183,7 +1174,7 @@ struct GameFilterChip: View {
                     isSelected: gameType == .shikaku,
                     progress: nil
                 ) {
-                    print("Tapped \(gameType.displayName)")
+                    // Tapped game type
                 }
             }
         }

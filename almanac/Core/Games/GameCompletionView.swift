@@ -14,6 +14,13 @@ struct GameCompletionView: View {
   let session: GameSession
   
   @State private var isVisible = false
+  
+  private var isPracticeMode: Bool {
+    if case .practice = session.context {
+      return true
+    }
+    return false
+  }
 
   init(isGameLost: Bool, formattedDuration: String, coordinator: GameCoordinator, session: GameSession) {
     self.isGameLost = isGameLost
@@ -61,6 +68,31 @@ struct GameCompletionView: View {
 
           // Action buttons with stagger animation
           VStack(spacing: 12) {
+            // Next button for practice mode only
+            if case .practice = session.context {
+              Button {
+                // Start a new practice level
+                if let level = LevelManager.shared.getRandomLevelForGame(session.gameType) {
+                  // Create a new session and notify the parent view to reload
+                  let newSession = GameSession(gameType: session.gameType, level: level, context: .practice())
+                  NotificationCenter.default.post(name: .loadNewPracticeLevel, object: newSession)
+                }
+              } label: {
+                HStack(spacing: 8) {
+                  Image(systemName: "arrow.right.circle.fill")
+                  Text("Next Level")
+                }
+                .fontWeight(.semibold)
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .frame(height: 50)
+                .background(session.gameType.color, in: RoundedRectangle(cornerRadius: 12))
+              }
+              .opacity(isVisible ? 1 : 0)
+              .offset(y: isVisible ? 0 : 30)
+              .animation(.easeOut(duration: 0.4).delay(0.5), value: isVisible)
+            }
+            
             HStack(spacing: 12) {
               Button {
                 coordinator.dismissFullScreen()
@@ -70,10 +102,15 @@ struct GameCompletionView: View {
                   Text("Home")
                 }
                 .fontWeight(.semibold)
-                .foregroundStyle(.white)
+                .foregroundStyle(isPracticeMode ? session.gameType.color : .white)
                 .frame(maxWidth: .infinity)
                 .frame(height: 50)
-                .background(session.gameType.color, in: RoundedRectangle(cornerRadius: 12))
+                .background(isPracticeMode ? Color.clear : session.gameType.color, in: RoundedRectangle(cornerRadius: 12))
+                .overlay(
+                  isPracticeMode ?
+                  RoundedRectangle(cornerRadius: 12)
+                    .stroke(session.gameType.color, lineWidth: 2) : nil
+                )
               }
               .opacity(isVisible ? 1 : 0)
               .offset(y: isVisible ? 0 : 30)
@@ -122,4 +159,9 @@ struct GameCompletionView: View {
     }
     .sensoryFeedback(.success, trigger: isVisible)
   }
+}
+
+extension Notification.Name {
+  static let loadNewPracticeLevel = Notification.Name("loadNewPracticeLevel")
+  static let practiceSessionCompleted = Notification.Name("practiceSessionCompleted")
 }

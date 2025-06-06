@@ -15,7 +15,6 @@ struct DebugCompleteButton: View {
     
     var body: some View {
         Button("🚀 DEBUG: \(label)") {
-            print("🔧 DEBUG: Force completing \(session.gameType.displayName)")
             session.complete()
         }
         .padding(.horizontal, 12)
@@ -35,30 +34,20 @@ class GameCoordinator {
     var presentedFullScreen: FullScreenDestination?
 
     enum NavigationDestination: Hashable {
-        case practiceMode
         case gameSelection(Date)
-        case statistics
 
         static func == (lhs: NavigationDestination, rhs: NavigationDestination) -> Bool {
             switch (lhs, rhs) {
-            case (.practiceMode, .practiceMode), (.statistics, .statistics):
-                return true
             case (.gameSelection(let lhsDate), .gameSelection(let rhsDate)):
                 return Calendar.current.isDate(lhsDate, inSameDayAs: rhsDate)
-            default:
-                return false
             }
         }
 
         func hash(into hasher: inout Hasher) {
             switch self {
-            case .practiceMode:
-                hasher.combine("practiceMode")
             case .gameSelection(let date):
                 hasher.combine("gameSelection")
                 hasher.combine(Calendar.current.startOfDay(for: date))
-            case .statistics:
-                hasher.combine("statistics")
             }
         }
     }
@@ -66,11 +55,15 @@ class GameCoordinator {
     enum SheetDestination: Identifiable {
         case gameSelection(Date)
         case statistics
+        case practice
+        case profile
 
         var id: String {
             switch self {
             case .gameSelection: return "gameSelection"
             case .statistics: return "statistics"
+            case .practice: return "practice"
+            case .profile: return "profile"
             }
         }
     }
@@ -136,6 +129,14 @@ class GameCoordinator {
     func showStatistics() {
         presentSheet(.statistics)
     }
+    
+    func showProfile() {
+        presentSheet(.profile)
+    }
+    
+    func showPractice() {
+        presentSheet(.practice)
+    }
 }
 
 // MARK: - Game Session Management
@@ -160,7 +161,7 @@ class GameSession {
 
     enum GameContext {
         case daily(Date)
-        case practice
+        case practice(PracticeMode = .normal)
         case random
     }
 
@@ -185,7 +186,6 @@ class GameSession {
             isPaused = false
         }
 
-        print("🎯 Game completed: \(gameType.displayName) in \(formattedPlayTime)")
     }
 
     func pause() {
@@ -195,7 +195,6 @@ class GameSession {
         pauseStartTime = Date()
         lastActiveTime = Date()
 
-        print("⏸️ Game paused: \(gameType.displayName)")
     }
 
     func resume() {
@@ -206,7 +205,6 @@ class GameSession {
         pauseStartTime = nil
         lastActiveTime = Date()
 
-        print("▶️ Game resumed: \(gameType.displayName)")
     }
 
     // MARK: - Time Calculations
@@ -292,8 +290,8 @@ extension GameSession.GameContext {
         switch self {
         case .daily:
             return "Daily Challenge"
-        case .practice:
-            return "Practice Mode"
+        case .practice(let mode):
+            return "\(mode.displayName) Practice"
         case .random:
             return "Random Level"
         }
@@ -319,39 +317,60 @@ class ProgressManager {
     }
 
     func recordCompletion(session: GameSession) {
-        print("💾 Recording completion for \(session.gameType.displayName)")
-        print("   📅 Session context: \(session.context)")
         
-        // Record daily completion
-        if case .daily(let date) = session.context {
+        switch session.context {
+        case .daily(let date):
+            // Record daily completion
             let completion = DailyCompletion(
                 date: date,
                 gameType: session.gameType,
                 levelDataId: session.level.id,
                 completionTime: session.actualPlayTime
             )
-            print("   📝 Creating DailyCompletion:")
-            print("      - Date: \(date)")
-            print("      - Game: \(session.gameType.displayName)")
-            print("      - Time: \(session.actualPlayTime)")
             
             modelContext.insert(completion)
-            print("   ✅ DailyCompletion inserted into context")
-        } else {
-            print("   ⏭️ Not a daily session, skipping daily completion")
+            
+            // Update game progress for daily challenges
+            updateGameProgress(for: session.gameType, completionTime: session.actualPlayTime)
+            
+            // Update streaks using the new StatisticsManager
+            statisticsManager.updateStreaks(for: session.gameType)
+            
+        case .practice(let mode):
+            // Record practice session
+            let practiceSession = PracticeSession(
+                gameType: session.gameType,
+                levelDataId: session.level.id
+            )
+            practiceSession.markCompleted(in: session.actualPlayTime)
+            
+            
+            modelContext.insert(practiceSession)
+            
+            // Update practice progress
+            updatePracticeProgress(for: session.gameType, session: practiceSession)
+            
+            // Check badges for practice modes
+            let badgeManager = BadgeManager(modelContext: modelContext)
+            if let profile = getPlayerProfile() {
+                profile.addExperience(10) // Base XP for completing puzzle
+                badgeManager.checkAndUnlockBadges(profile: profile)
+            }
+            
+            // Notify for mode-specific tracking
+            NotificationCenter.default.post(
+                name: .practiceSessionCompleted,
+                object: ["mode": mode, "gameType": session.gameType]
+            )
+            
+        case .random:
+            break
         }
-
-        // Update game progress
-        updateGameProgress(for: session.gameType, completionTime: session.actualPlayTime)
-
-        // Update streaks using the new StatisticsManager
-        statisticsManager.updateStreaks(for: session.gameType)
 
         do {
             try modelContext.save()
-            print("   💾 Context saved successfully")
         } catch {
-            print("❌ Failed to save completion: \(error)")
+            // Failed to save completion
         }
     }
 
@@ -365,6 +384,20 @@ class ProgressManager {
         } else {
             let newProgress = GameProgress(gameType: gameType)
             newProgress.updateProgress(completionTime: completionTime)
+            modelContext.insert(newProgress)
+        }
+    }
+    
+    private func updatePracticeProgress(for gameType: GameType, session: PracticeSession) {
+        let fetchDescriptor = FetchDescriptor<PracticeProgress>(
+            predicate: #Predicate<PracticeProgress> { $0.gameType == gameType }
+        )
+
+        if let progress = try? modelContext.fetch(fetchDescriptor).first {
+            progress.updateProgress(session: session)
+        } else {
+            let newProgress = PracticeProgress(gameType: gameType)
+            newProgress.updateProgress(session: session)
             modelContext.insert(newProgress)
         }
     }
@@ -408,6 +441,11 @@ class ProgressManager {
     var statistics: StatisticsManager {
         return statisticsManager
     }
+    
+    private func getPlayerProfile() -> PlayerProfile? {
+        let descriptor = FetchDescriptor<PlayerProfile>()
+        return try? modelContext.fetch(descriptor).first
+    }
 }
 
 // MARK: Sets GameSession Extension
@@ -426,7 +464,6 @@ extension GameSession {
     if gameType == .sets {
       let levelData = SetsLevelData(id: level.id, difficulty: level.difficulty)
       setsGame.loadLevel(levelData)
-      print("✅ Loaded Sets level: \(levelData.id)")
     }
 
     Self.setsGameInstances[sessionKey] = setsGame
@@ -459,9 +496,7 @@ extension GameSession {
             do {
                 let levelData = try level.decode(as: ShikakuLevelData.self)
                 shikakuGame.loadLevel(levelData)
-                print("✅ Loaded Shikaku level: \(levelData.id)")
             } catch {
-                print("❌ Failed to decode Shikaku level data: \(error)")
                 // Fallback: create a default level
                 shikakuGame.loadDefaultLevel()
             }
@@ -499,9 +534,7 @@ extension GameSession {
             do {
                 let levelData = try level.decode(as: WordleLevelData.self)
                 wordleGame = WordleGame(targetWord: levelData.targetWord, maxAttempts: levelData.maxAttempts)
-                print("✅ Loaded Wordle level: \(levelData.id) - \(levelData.targetWord)")
             } catch {
-                print("❌ Failed to decode Wordle level data: \(error)")
                 wordleGame = WordleGame(targetWord: "SWIFT", maxAttempts: 6)
             }
         } else {

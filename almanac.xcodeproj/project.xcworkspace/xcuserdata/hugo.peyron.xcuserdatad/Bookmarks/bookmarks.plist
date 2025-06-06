@@ -9,12 +9,16 @@
 			<dict>
 				<key>location-parameters</key>
 				<dict>
+					<key>EndingColumnNumber</key>
+					<string>0</string>
 					<key>EndingLineNumber</key>
-					<string>436</string>
+					<string>437</string>
+					<key>StartingColumnNumber</key>
+					<string>0</string>
 					<key>StartingLineNumber</key>
 					<string>436</string>
 					<key>Timestamp</key>
-					<string>770769995.744815</string>
+					<string>770824730.066601</string>
 				</dict>
 				<key>rebasable-url</key>
 				<dict>
@@ -30,16 +34,16 @@
 			<key>text-context</key>
 			<dict>
 				<key>focused</key>
-				<string>          return "Great job! 👏"
+				<string>
 </string>
 				<key>leading</key>
-				<string>
-    private func getCongratulationText() -&gt; String {
+				<string>        withAnimation(.easeInOut(duration: 0.3)) {
+            isPaused.toggle()
 </string>
 				<key>trailing</key>
-				<string>    }
-
-    private func togglePause() {
+				<string>            if isPaused {
+                session.pause()
+                stopTimer()
 </string>
 			</dict>
 			<key>type</key>

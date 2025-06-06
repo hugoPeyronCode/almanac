@@ -14,7 +14,11 @@ struct MultiGamePuzzleApp: App {
         let schema = Schema([
             GameLevel.self,
             GameProgress.self,
-            DailyCompletion.self
+            DailyCompletion.self,
+            PracticeSession.self,
+            PracticeProgress.self,
+            PlayerProfile.self,
+            PlayerBadge.self
         ])
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 
@@ -35,5 +39,5 @@ struct MultiGamePuzzleApp: App {
 
 #Preview {
     ContentView()
-        .modelContainer(for: [GameLevel.self, GameProgress.self, DailyCompletion.self])
+        .modelContainer(for: [GameLevel.self, GameProgress.self, DailyCompletion.self, PracticeSession.self, PracticeProgress.self])
 }

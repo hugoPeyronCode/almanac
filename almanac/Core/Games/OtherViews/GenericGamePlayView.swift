@@ -457,7 +457,7 @@ struct GamePlayView: View {
             let newSession = GameSession(
                 gameType: session.gameType,
                 level: newLevel,
-                context: .practice
+                context: .practice()
             )
             coordinator.presentFullScreen(.gamePlay(newSession))
         }
@@ -528,7 +528,7 @@ struct GameSelectionSheet: View {
     let session = GameSession(
         gameType: .pipe,
         level: mockLevel,
-        context: .practice
+        context: .practice()
     )
 
     GamePlayView(session: session)
@@ -573,28 +573,28 @@ struct GameSelectionSheet: View {
         .environment(GameCoordinator())
 }
 
-#Preview("GamePlayView - Completed State") {
-    let mockLevel = try! AnyGameLevel(MockShikakuLevel(
-        id: "shikaku_completed",
-        difficulty: 1,
-        estimatedTime: 60,
-        gridRows: 4,
-        gridCols: 4,
-        clues: []
-    ))
-
-    let session = GameSession(
-        gameType: .shikaku,
-        level: mockLevel,
-        context: .practice
-    )
-
-    // Simulate completion
-    session.complete()
-
-    return GamePlayView(session: session)
-        .environment(GameCoordinator())
-}
+//#Preview("GamePlayView - Completed State") {
+//    let mockLevel = try! AnyGameLevel(MockShikakuLevel(
+//        id: "shikaku_completed",
+//        difficulty: 1,
+//        estimatedTime: 60,
+//        gridRows: 4,
+//        gridCols: 4,
+//        clues: []
+//    ))
+//
+//    let session = GameSession(
+//        gameType: .shikaku,
+//        level: mockLevel,
+//        context: .practice()
+//    )
+//
+//    // Simulate completion
+//    session.complete()
+//
+//    GamePlayView(session: session)
+//        .environment(GameCoordinator())
+//}
 
 #Preview("GamePlayView - With SwiftData") {
     let config = ModelConfiguration(isStoredInMemoryOnly: true)
@@ -614,7 +614,7 @@ struct GameSelectionSheet: View {
         context: .daily(Date())
     )
 
-    return GamePlayView(session: session)
+    GamePlayView(session: session)
         .environment(GameCoordinator())
         .modelContainer(container)
 }
@@ -631,7 +631,7 @@ struct GameSelectionSheet: View {
     let session = GameSession(
         gameType: .sets,
         level: mockLevel,
-        context: .practice
+        context: .practice()
     )
 
     GamePlayView(session: session)
@@ -646,7 +646,7 @@ struct GameSelectionSheet: View {
             let session = GameSession(
                 gameType: gameType,
                 level: mockLevel,
-                context: .practice
+                context: .practice()
             )
 
             GamePlayView(session: session)
@@ -780,7 +780,7 @@ struct MockWordleLevel: GameLevelData {
     let session = GameSession(
         gameType: .pipe,
         level: mockLevel,
-        context: .practice
+        context: .practice()
     )
     GamePlayView(session: session)
         .environment(GameCoordinator())

@@ -54,7 +54,7 @@ struct WordleGameView: View {
                         .padding(.bottom, 8)
                     
                     keyboardView
-                        .frame(maxWidth: min(geometry.size.width - 32, 400)) // Limit keyboard width
+                        .frame(maxWidth: min(geometry.size.width - 32, 400))
                 }
                 .padding(.horizontal)
                 .padding(.vertical, 8)

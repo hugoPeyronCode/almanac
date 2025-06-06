@@ -599,7 +599,7 @@ struct NumberClue {
   var isSatisfied: Bool = false
 }
 
-struct GridPosition: Hashable {
+struct GridPosition: Hashable, Codable {
   let row: Int
   let col: Int
 }

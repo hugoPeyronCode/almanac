@@ -62,14 +62,8 @@ struct GameHeaderView: View {
   var body: some View {
     HStack {
       // Exit Button
-      Button {
+      CloseButton {
         showExitConfirmation.wrappedValue = true
-      } label: {
-        Image(systemName: "xmark")
-          .font(.title2)
-          .foregroundStyle(Color.primary)
-          .frame(width: 44, height: 44)
-          .background(.ultraThinMaterial, in: Circle())
       }
       .sensoryFeedback(.impact(weight: .light), trigger: showExitConfirmation.wrappedValue)
 

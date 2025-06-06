@@ -87,22 +87,6 @@ struct PracticeModeView: View {
         }
       }
     }
-    .toolbar {
-      ToolbarItem(placement: .topBarLeading) {
-        Button {
-          dismiss()
-        } label: {
-          HStack(spacing: 6) {
-            Image(systemName: "chevron.left")
-              .font(.caption)
-              .fontWeight(.medium)
-            Text("Back")
-              .font(.body)
-          }
-          .foregroundStyle(.primary)
-        }
-      }
-    }
   }
   
   // MARK: - Header Section

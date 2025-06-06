@@ -54,26 +54,27 @@ class GameCoordinator {
 
     enum SheetDestination: Identifiable {
         case gameSelection(Date)
-        case statistics
-        case practice
-        case profile
 
         var id: String {
             switch self {
             case .gameSelection: return "gameSelection"
-            case .statistics: return "statistics"
-            case .practice: return "practice"
-            case .profile: return "profile"
             }
         }
     }
 
     enum FullScreenDestination: Identifiable, Equatable {
         case gamePlay(GameSession)
+      case statistics
+      case practice
+      case profile
+
 
         var id: String {
             switch self {
             case .gamePlay: return "gamePlay"
+            case .statistics: return "statistics"
+            case .practice: return "practice"
+            case .profile: return "profile"
             }
         }
 
@@ -81,6 +82,14 @@ class GameCoordinator {
             switch (lhs, rhs) {
             case (.gamePlay(let lhsSession), .gamePlay(let rhsSession)):
                 return lhsSession.id == rhsSession.id
+            case (.statistics, .statistics):
+                return true
+            case (.practice, .practice):
+                return true
+            case (.profile, .profile):
+                return true
+            default:
+                return false
             }
         }
     }
@@ -127,15 +136,15 @@ class GameCoordinator {
     }
 
     func showStatistics() {
-        presentSheet(.statistics)
+      presentFullScreen(.statistics)
     }
     
     func showProfile() {
-        presentSheet(.profile)
+      presentFullScreen(.profile)
     }
     
     func showPractice() {
-        presentSheet(.practice)
+      presentFullScreen(.practice)
     }
 }
 

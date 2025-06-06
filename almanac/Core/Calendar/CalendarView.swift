@@ -22,6 +22,7 @@ struct CalendarView: View {
   @State private var currentMonth = Date()
   @State private var isCompactMode = true
   @State private var showingCompletionCelebration = false
+  @State private var showingPipeLevelEditor = false
 
   // MARK: - Game Filter State with UserDefaults persistence
   @State private var selectedGames: Set<GameType> = []
@@ -78,9 +79,6 @@ struct CalendarView: View {
           }
       }
       .environment(coordinator)
-      .navigationDestination(for: GameCoordinator.NavigationDestination.self) { destination in
-        navigationContent(for: destination)
-      }
       .alert("🎉 Day Complete!", isPresented: $showingCompletionCelebration) {
         Button("Great!") { }
       } message: {
@@ -88,12 +86,85 @@ struct CalendarView: View {
       }
     }
     .sheet(item: $coordinator.presentedSheet) { destination in
-      sheetContent(for: destination)
-        .presentationBackground(.ultraThinMaterial)
+      switch destination {
+      case .gameSelection(let date):
+        GameSelectionSheet(date: date)
+          .environment(coordinator)
+          .presentationBackground(.ultraThinMaterial)
+      }
     }
     .fullScreenCover(item: $coordinator.presentedFullScreen) { destination in
-      fullScreenContent(for: destination)
-        .presentationBackground(.ultraThinMaterial)
+      switch destination {
+      case .gamePlay(let session):
+        Group {
+          if case .practice = session.context {
+            PracticeGameWrapper(session: session)
+          } else {
+            switch session.gameType {
+            case .pipe:
+              PipeGameView(session: session)
+            case .shikaku:
+              ShikakuGameView(session: session)
+            case .sets:
+              SetsGameView(session: session)
+            case .wordle:
+              WordleGameView(session: session)
+            default:
+              GamePlayView(session: session)
+            }
+          }
+        }
+        .environment(coordinator)
+        .environment(\.modelContext, modelContext)
+        .onChange(of: session.isCompleted) { _, isCompleted in
+          if isCompleted {
+            if let progressManager = progressManager {
+              progressManager.recordCompletion(session: session)
+            }
+          }
+        }
+      case .statistics:
+        NavigationView {
+          StatisticsView()
+            .environment(coordinator)
+            .environment(\.modelContext, modelContext)
+            .toolbar {
+              ToolbarItem(placement: .navigationBarTrailing) {
+                CloseButton {
+                  coordinator.dismissFullScreen()
+                }
+              }
+            }
+        }
+      case .practice:
+        NavigationView {
+          PracticeModeView()
+            .environment(coordinator)
+            .environment(\.modelContext, modelContext)
+            .toolbar {
+              ToolbarItem(placement: .navigationBarTrailing) {
+                CloseButton {
+                  coordinator.dismissFullScreen()
+                }
+              }
+            }
+        }
+      case .profile:
+        NavigationView {
+          ProfileView()
+            .environment(\.modelContext, modelContext)
+            .toolbar {
+              ToolbarItem(placement: .navigationBarTrailing) {
+                CloseButton {
+                  coordinator.dismissFullScreen()
+                }
+              }
+            }
+        }
+      }
+    }
+    .fullScreenCover(isPresented: $showingPipeLevelEditor) {
+      PipeLevelEditorView()
     }
     .onAppear {
       progressManager = ProgressManager(modelContext: modelContext)
@@ -126,6 +197,14 @@ struct CalendarView: View {
           coordinator.showProfile()
         } label: {
           Image(systemName: "person.circle.fill")
+            .font(.title2)
+            .foregroundStyle(Color.secondary)
+        }
+        
+        Button {
+          showingPipeLevelEditor = true
+        } label: {
+          Image(systemName: "wrench.and.screwdriver")
             .font(.title2)
             .foregroundStyle(Color.secondary)
         }
@@ -640,73 +719,6 @@ struct CalendarView: View {
   }
 
 
-  // MARK: - Navigation Content
-  
-  @ViewBuilder
-  private func navigationContent(for destination: GameCoordinator.NavigationDestination) -> some View {
-    switch destination {
-    case .gameSelection(let date):
-      GameSelectionView(date: date)
-        .environment(coordinator)
-    }
-  }
-
-  @ViewBuilder
-  private func sheetContent(for destination: GameCoordinator.SheetDestination) -> some View {
-    switch destination {
-    case .gameSelection(let date):
-      GameSelectionSheet(date: date)
-        .environment(coordinator)
-    case .statistics:
-      StatisticsView()
-        .environment(coordinator)
-        .environment(\.modelContext, modelContext)
-    case .practice:
-      PracticeModeView()
-        .environment(coordinator)
-        .environment(\.modelContext, modelContext)
-    case .profile:
-      ProfileView()
-        .environment(\.modelContext, modelContext)
-    }
-  }
-
-  @ViewBuilder
-  private func fullScreenContent(for destination: GameCoordinator.FullScreenDestination) -> some View {
-    switch destination {
-    case .gamePlay(let session):
-      // Route to specific game view based on game type
-      Group {
-        if case .practice = session.context {
-          // Use wrapper for practice sessions to handle level transitions
-          PracticeGameWrapper(session: session)
-        } else {
-          // Direct routing for non-practice sessions
-          switch session.gameType {
-          case .pipe:
-            PipeGameView(session: session)
-          case .shikaku:
-            ShikakuGameView(session: session)
-          case .sets:
-            SetsGameView(session: session)
-          case .wordle:
-            WordleGameView(session: session)
-          default:
-            GamePlayView(session: session)
-          }
-        }
-      }
-      .environment(coordinator)
-      .environment(\.modelContext, modelContext)
-      .onChange(of: session.isCompleted) { _, isCompleted in
-        if isCompleted {
-          if let progressManager = progressManager {
-            progressManager.recordCompletion(session: session)
-          }
-        }
-      }
-    }
-  }
 
   // MARK: - Helper Methods (Keep existing implementation but update for filtered data)
 
@@ -1188,3 +1200,4 @@ extension Set where Element == GameType {
         return self.sorted(by: { $0.rawValue < $1.rawValue }).map { $0.color }
     }
 }
+

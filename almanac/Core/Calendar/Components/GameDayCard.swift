@@ -1,213 +1,12 @@
 //
-//  CalendarComponents.swift
-//  Multi-Game Puzzle App
+//  GameDayCard.swift
+//  almanac
 //
-//  Supporting components for the calendar view
+//  Created by Hugo Peyron on 09/06/2025.
 //
+
 
 import SwiftUI
-
-// MARK: - Calendar Day View
-
-struct CalendarDayView: View {
-  let day: CalendarDay
-  let isSelected: Bool
-  let completionStatus: DayCompletionStatus
-  let selectedGamesColors: [Color]
-  let isCompact: Bool
-  let canPlay: Bool
-  let onTap: () -> Void
-
-  private var isToday: Bool {
-    Calendar.current.isDateInToday(day.date)
-  }
-
-  private var dayState: DayState {
-    if !day.isCurrentMonth && !isCompact { return .inactive }
-    if !canPlay { return .disabled }
-
-    switch completionStatus {
-    case .none: 
-      return isToday ? .today : .hasLevels
-    case .partiallyCompleted: 
-      return isToday ? .todayPartiallyCompleted : .partiallyCompleted
-    case .allCompleted: 
-      return isToday ? .todayAllCompleted : .allCompleted
-    }
-  }
-
-  enum DayState {
-    case inactive, hasLevels, partiallyCompleted, allCompleted, today, disabled
-    case todayPartiallyCompleted, todayAllCompleted
-  }
-
-  var body: some View {
-    Button(action: onTap) {
-      if isCompact {
-        compactDayView
-          .padding(.vertical)
-      } else {
-        fullDayView
-      }
-    }
-    .buttonStyle(.plain)
-    .disabled((!day.isCurrentMonth && !isCompact) || !canPlay)
-    .sensoryFeedback(.impact(weight: .light), trigger: isSelected)
-  }
-
-  private var compactDayView: some View {
-    VStack(spacing: 8) {
-      ZStack {
-        Circle()
-          .fill(isToday ? .ultraThinMaterial : .thinMaterial)
-          .frame(width: 36, height: 36)
-          .overlay(
-            Circle()
-              .stroke(isSelected ? Color.primary : Color.clear, lineWidth: 2)
-          )
-          .overlay(progressRing)
-          .overlay(todayHighlight)
-
-        if dayState == .allCompleted || dayState == .todayAllCompleted {
-          Image(systemName: "checkmark")
-            .font(.caption)
-            .fontWeight(.bold)
-            .foregroundStyle(.primary)
-        } else if day.isCurrentMonth {
-          Text("\(day.dayNumber)")
-            .font(.system(size: 16, weight: isSelected ? .bold : .medium))
-            .foregroundStyle(dayState == .inactive ? .clear : dayState == .disabled ? .secondary : .primary)
-        }
-      }
-
-      Text(dayLabel)
-        .font(.system(size: 10, weight: .medium))
-        .foregroundStyle(.secondary)
-    }
-    .opacity(dayState == .disabled ? 0.4 : 1.0)
-  }
-
-  private var fullDayView: some View {
-    VStack(spacing: 4) {
-      ZStack {
-        Circle()
-          .foregroundStyle(isToday ? .ultraThinMaterial : .thinMaterial)
-          .frame(width: 44, height: 44)
-          .overlay(progressRing)
-          .overlay(selectionHighlight)
-          .overlay(todayHighlight)
-
-        if dayState == .allCompleted || dayState == .todayAllCompleted {
-          Image(systemName: "checkmark")
-            .font(.title3)
-            .fontWeight(.bold)
-            .foregroundStyle(.primary)
-        } else if day.isCurrentMonth {
-          Text("\(day.dayNumber)")
-            .font(.system(size: 16, weight: dayState == .today || dayState == .todayPartiallyCompleted ? .bold : .medium))
-            .foregroundStyle(dayState == .inactive ? . clear : .primary)
-        }
-      }
-
-      Text(dayLabel)
-        .font(.system(size: 10, weight: .medium))
-        .foregroundStyle(.secondary)
-    }
-  }
-  private var progressRing: some View {
-    Group {
-      if case .partiallyCompleted(let completed, let total) = completionStatus, completed > 0 {
-        let progress = Double(completed) / Double(total)
-            Circle()
-              .trim(from: 0, to: progress)
-              .stroke(
-                LinearGradient(
-                  colors: selectedGamesColors,
-                  startPoint: UnitPoint.topLeading,
-                  endPoint: UnitPoint.bottomTrailing
-                ),
-                style: StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round)
-              )
-              .rotationEffect(Angle.degrees(-90))
-          .frame(width: isCompact ? 40 : 48, height: isCompact ? 40 : 48)
-      }
-    }
-  }
-
-  private var completionIndicator: some View {
-    Group {
-      if case .partiallyCompleted(let completed, let total) = completionStatus, !isCompact {
-        VStack {
-          HStack {
-            Spacer()
-            Text("\(completed)/\(total)")
-              .font(.system(size: 8, weight: .bold))
-              .foregroundStyle(.white)
-              .padding(.horizontal, 4)
-              .padding(.vertical, 2)
-              .background(
-                Capsule()
-                  .fill(.primary.opacity(0.4))
-              )
-          }
-          Spacer()
-        }
-        .frame(width: 44, height: 44)
-      }
-    }
-  }
-
-  private var selectionHighlight: some View {
-    Group {
-      if isSelected {
-        Circle()
-          .stroke(
-            LinearGradient(
-              colors: [Color.primary],
-              startPoint: UnitPoint.top,
-              endPoint: UnitPoint.bottom
-            ),
-            lineWidth: 3
-          )
-          .frame(width: 48, height: 48)
-          .shadow(color: Color.blue.opacity(0.3), radius: 4)
-      }
-    }
-  }
-  
-  private var todayHighlight: some View {
-    Group {
-      if isToday {
-        Circle()
-          .stroke(
-            LinearGradient(
-              colors: [Color.orange, Color.yellow],
-              startPoint: UnitPoint.topLeading,
-              endPoint: UnitPoint.bottomTrailing
-            ),
-            lineWidth: 2
-          )
-          .frame(width: isCompact ? 40 : 48, height: isCompact ? 40 : 48)
-          .shadow(color: Color.orange.opacity(0.4), radius: 3)
-      }
-    }
-  }
-
-  private var dayLabel: String {
-    let formatter = DateFormatter()
-    formatter.dateFormat = "E"
-    return day.isCurrentMonth || isCompact ? formatter.string(from: day.date) : ""
-  }
-}
-
-
-#Preview {
-  CalendarDayView(day: CalendarDay(date: Date(), dayNumber: 20, isCurrentMonth: true), isSelected: true, completionStatus: .partiallyCompleted(1, 5), selectedGamesColors: [.purple, .cyan, .brown, .orange], isCompact: false, canPlay: true) {
-    //
-  }
-}
-
-// MARK: - Game Day Card
 
 struct GameDayCard: View {
   let gameType: GameType
@@ -393,43 +192,6 @@ struct GameDayCard: View {
   }
 }
 
-// MARK: - Stat Card
-
-struct StatCard: View {
-  let value: Int
-  let label: String
-  let icon: String
-  let color: Color
-
-  var body: some View {
-    VStack(spacing: 8) {
-      Image(systemName: icon)
-        .font(.title3)
-        .foregroundStyle(.primary)
-
-      Text("\(value)")
-        .font(.title3)
-        .fontWeight(.medium)
-        .monospacedDigit()
-
-      Text(label)
-        .font(.caption2)
-        .foregroundStyle(.secondary)
-        .multilineTextAlignment(.center)
-        .lineLimit(2)
-    }
-    .frame(maxWidth: .infinity)
-    .padding(.vertical, 12)
-    .background(
-      RoundedRectangle(cornerRadius: 12)
-        .fill(color.opacity(0.1))
-    )
-  }
-}
-
-#Preview("stats card") {
-  StatCard(value: 150, label: "streak", icon: "fire.fill", color: .red)
-}
 
 #Preview("GameDayCard - All Game Types") {
   LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 16), count: 2), spacing: 16) {
@@ -466,7 +228,7 @@ struct StatCard: View {
         print("Future game tapped")
       }
     )
-    
+
     GameDayCard(
       gameType: .shikaku,
       date: Date(),
@@ -481,6 +243,7 @@ struct StatCard: View {
   }
   .padding()
 }
+
 
 private func createMockProgress(for gameType: GameType) -> GameProgress? {
   // 70% chance of having progress
@@ -539,48 +302,5 @@ private func createMockLevel(for gameType: GameType) -> AnyGameLevel {
     }
   } catch {
     fatalError("Failed to create mock level: \(error)")
-  }
-}
-
-
-// MARK: - Star Difficulty Component
-
-struct DifficultyStars: View {
-  let difficulty: Int
-  let maxStars: Int = 5
-  let size: CGFloat
-  let spacing: CGFloat
-
-  init(difficulty: Int, size: CGFloat = 12, spacing: CGFloat = 2) {
-    self.difficulty = max(1, min(5, difficulty)) // Clamp between 1-5
-    self.size = size
-    self.spacing = spacing
-  }
-
-  var body: some View {
-    HStack(spacing: spacing) {
-      ForEach(1...maxStars, id: \.self) { star in
-        Image(systemName: star <= difficulty ? "star.fill" : "star")
-          .font(.system(size: size))
-          .foregroundStyle(star <= difficulty ? starColor(for: difficulty) : .secondary.opacity(0.3))
-      }
-    }
-  }
-
-  private func starColor(for difficulty: Int) -> Color {
-    switch difficulty {
-    case 1:
-      return .green
-    case 2:
-      return .mint
-    case 3:
-      return .yellow
-    case 4:
-      return .orange
-    case 5:
-      return .red
-    default:
-      return .gray
-    }
   }
 }

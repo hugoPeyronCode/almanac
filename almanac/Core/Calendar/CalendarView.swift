@@ -12,7 +12,6 @@ struct CalendarView: View {
   @Environment(\.colorScheme) var colorScheme
   @Environment(\.modelContext) private var modelContext
 
-  // SwiftData queries to observe changes
   @Query private var allCompletions: [DailyCompletion]
   @Query private var allProgress: [GameProgress]
 
@@ -24,7 +23,6 @@ struct CalendarView: View {
   @State private var showingCompletionCelebration = false
   @State private var showingPipeLevelEditor = false
 
-  // MARK: - Game Filter State with UserDefaults persistence
   @State private var selectedGames: Set<GameType> = []
   @State private var showingAllGames = true
   @State private var showingFilters = false
@@ -109,8 +107,6 @@ struct CalendarView: View {
               SetsGameView(session: session)
             case .wordle:
               WordleGameView(session: session)
-            default:
-              GamePlayView(session: session)
             }
           }
         }
@@ -1073,20 +1069,6 @@ struct CalendarView: View {
   }
 }
 
-// MARK: - Supporting Types
-
-struct CalendarDay {
-  let date: Date
-  let dayNumber: Int
-  let isCurrentMonth: Bool
-}
-
-enum DayCompletionStatus {
-  case none
-  case partiallyCompleted(Int, Int)
-  case allCompleted
-}
-
 #Preview("Calendar - With Sample Data") {
     let config = ModelConfiguration(isStoredInMemoryOnly: true)
     let container = try! ModelContainer(for: DailyCompletion.self, GameProgress.self, configurations: config)
@@ -1131,67 +1113,6 @@ enum DayCompletionStatus {
 
     return CalendarView()
         .modelContainer(container)
-}
-
-// MARK: - Game Filter Chip Component
-
-struct GameFilterChip: View {
-    let gameType: GameType
-    let isSelected: Bool
-    let progress: GameProgress?
-    let onTap: () -> Void
-
-    var body: some View {
-        Button(action: onTap) {
-            VStack(spacing: 8) {
-                HStack(spacing: 8) {
-                    Image(systemName: gameType.icon)
-                        .font(.title3)
-                        .foregroundStyle(gameType.color)
-
-                    Text(gameType.displayName)
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                        .foregroundStyle(.primary)
-                }
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-            .background(
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(gameType.color.opacity(0.1))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 16)
-                            .stroke(
-                                isSelected ? gameType.color : gameType.color.opacity(0.3),
-                                lineWidth: isSelected ? 2 : 0
-                            )
-                    )
-            )
-        }
-        .padding(.vertical, 5)
-        .buttonStyle(.plain)
-        .scaleEffect(isSelected ? 1.0 : 0.95)
-        .animation(.spring(duration: 0.2), value: isSelected)
-        .sensoryFeedback(.impact(weight: .light), trigger: isSelected)
-    }
-}
-
-#Preview("Game Filter Chips") {
-    ScrollView(.horizontal) {
-        HStack(spacing: 12) {
-            ForEach(GameType.allCases, id: \.self) { gameType in
-                GameFilterChip(
-                    gameType: gameType,
-                    isSelected: gameType == .shikaku,
-                    progress: nil
-                ) {
-                    // Tapped game type
-                }
-            }
-        }
-        .padding()
-    }
 }
 
 extension Set where Element == GameType {

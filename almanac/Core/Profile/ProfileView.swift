@@ -45,15 +45,7 @@ struct ProfileView: View {
                     .padding(.horizontal)
                 }
             }
-            .navigationTitle("Profile")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button("Done") {
-                        dismiss()
-                    }
-                }
-            }
         }
         .onAppear {
             setupProfile()

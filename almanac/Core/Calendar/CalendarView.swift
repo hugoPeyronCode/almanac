@@ -50,8 +50,7 @@ struct CalendarView: View {
               }
 
               CalendarSection(
-                viewModel: viewModel,
-                weekProgress: viewModel.getVisibleWeekProgress(completions: allCompletions)
+                viewModel: viewModel
               )
 
               SelectedDateSection(
@@ -167,7 +166,7 @@ struct CalendarView: View {
           .environment(coordinator)
           .environment(\.modelContext, modelContext)
           .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
+            ToolbarItem(placement: .navigationBarLeading) {
               CloseButton {
                 coordinator.dismissFullScreen()
               }
@@ -181,7 +180,7 @@ struct CalendarView: View {
           .environment(coordinator)
           .environment(\.modelContext, modelContext)
           .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
+            ToolbarItem(placement: .navigationBarLeading) {
               CloseButton {
                 coordinator.dismissFullScreen()
               }
@@ -194,7 +193,7 @@ struct CalendarView: View {
         ProfileView()
           .environment(\.modelContext, modelContext)
           .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
+            ToolbarItem(placement: .navigationBarLeading) {
               CloseButton {
                 coordinator.dismissFullScreen()
               }
@@ -248,13 +247,11 @@ struct GameFilterSection: View {
 
 struct CalendarSection: View {
   @Bindable var viewModel: CalendarViewModel
-  let weekProgress: WeekProgress?
 
   var body: some View {
     VStack(spacing: 16) {
       CalendarMonthHeader(
-        viewModel: viewModel,
-        weekProgress: weekProgress
+        viewModel: viewModel
       )
 
       CalendarHorizontalView(

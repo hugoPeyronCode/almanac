@@ -8,21 +8,18 @@
 import SwiftUI
 
 struct CloseButton: View {
-    let action: () -> Void
-    
-    var body: some View {
-        Button(action: action) {
-            Image(systemName: "xmark")
-                .font(.title2)
-                .foregroundStyle(.primary)
-                .frame(width: 44, height: 44)
-                .background(.ultraThinMaterial, in: Circle())
-        }
+  let action: () -> Void
+
+  var body: some View {
+    Button(action: action) {
+      Image(systemName: "xmark")
+        .foregroundStyle(Color.primary)
+        .font(.subheadline)
     }
+  }
 }
 
 #Preview {
-    CloseButton {
-        // Action
-    }
+  CloseButton {
+  }
 }

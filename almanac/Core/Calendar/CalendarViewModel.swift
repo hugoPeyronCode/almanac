@@ -146,42 +146,6 @@ class CalendarViewModel {
         return nil
     }
 
-    // MARK: - Progress Calculations
-
-    func getVisibleWeekProgress(completions: [DailyCompletion]) -> WeekProgress? {
-        guard let weekInterval = calendar.dateInterval(of: .weekOfYear, for: currentMonth) else {
-            return nil
-        }
-
-        var completedCount = 0
-        var totalPossible = 0
-        let gamesCount = selectedGames.count
-
-        guard gamesCount > 0 else {
-            return WeekProgress(completed: 0, total: 0, percentage: 0, totalGames: 0)
-        }
-
-        let today = Date()
-        var currentDate = weekInterval.start
-
-        while currentDate < weekInterval.end {
-            if currentDate <= today {
-                totalPossible += gamesCount
-
-                let dayCompleted = selectedGames.filter { gameType in
-                    isGameCompletedForDate(currentDate, gameType: gameType, completions: completions)
-                }.count
-
-                completedCount += dayCompleted
-            }
-
-            currentDate = calendar.date(byAdding: .day, value: 1, to: currentDate) ?? currentDate
-        }
-
-        let percentage = totalPossible > 0 ? Double(completedCount) / Double(totalPossible) : 0
-        return WeekProgress(completed: completedCount, total: totalPossible, percentage: percentage, totalGames: gamesCount)
-    }
-
     func getSelectedDayProgress(completions: [DailyCompletion]) -> DayProgress? {
         let gamesCount = selectedGames.count
 
@@ -238,15 +202,6 @@ class CalendarViewModel {
     private func updateSelectAllState() {
         showingAllGames = selectedGames.count == GameType.allCases.count
     }
-}
-
-// MARK: - Data Models
-
-struct WeekProgress {
-    let completed: Int
-    let total: Int
-    let percentage: Double
-    let totalGames: Int
 }
 
 struct DayProgress {

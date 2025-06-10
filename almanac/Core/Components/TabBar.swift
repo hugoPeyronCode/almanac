@@ -29,13 +29,10 @@ struct TabBar: View {
 
   var body: some View {
     ZStack {
-      // Tab bar background
       tabBarBackground
 
-      // Side buttons
       sideButtons
 
-      // Center play button
       centerPlayButton
     }
     .frame(width: 200, height: 60)
@@ -102,15 +99,20 @@ struct TabBar: View {
   @ViewBuilder
   private var playButtonContent: some View {
     ZStack {
-      // Button background
-      Circle()
-        .fill(playButtonBackgroundColor)
-        .frame(width: 50, height: 50)
+          Circle()
+            .foregroundStyle(playButtonBackgroundColor)
+            .opacity(0.5)
+            .overlay(content: {
+              Circle()
+                .stroke(lineWidth: 1)
+                .foregroundStyle(playButtonBackgroundColor)
+            })
+        .frame(width: 40, height: 40)
 
-      // Button icon
       playButtonIcon
         .font(.system(size: 16))
-        .foregroundStyle(.white)
+        .fontWeight(.bold)
+        .foregroundStyle(Color.primary)
     }
     .scaleEffect(1.2)
     .opacity(isGameComplete ? 0.6 : 1.0)
@@ -118,44 +120,34 @@ struct TabBar: View {
   }
 
   private var playButtonBackgroundColor: Color {
-    isGameComplete ? .green : gameType.color
+    isGameComplete ? .primary : gameType.color
   }
 
   @ViewBuilder
   private var playButtonIcon: some View {
-    Image(systemName: isGameComplete ? "checkmark.circle.fill" : "play.fill")
+    Image(systemName: isGameComplete ? "checkmark" : "play.fill")
   }
 
   // MARK: - Game State Management
-
   private func updateGameState() {
     isGameComplete = isGameCompletedForDate(selectedDate, gameType: gameType)
-
-    let dateString = DateFormatter.localizedString(from: selectedDate, dateStyle: .short, timeStyle: .none)
-    print("🔄 Game state for \(dateString):")
-    print("   🎮 Game: \(gameType.displayName)")
-    print("   ✅ Complete: \(isGameComplete)")
+    _ = DateFormatter.localizedString(from: selectedDate, dateStyle: .short, timeStyle: .none)
   }
 
   // MARK: - Play Button Action
-
   private func handlePlayButtonTap() {
     guard !isGameComplete else {
-      print("🚫 Game already completed for \(selectedDate)")
       return
     }
-
     startGame(gameType)
   }
 
   private func startGame(_ gameType: GameType) {
     guard canPlayOnDate(selectedDate) else {
-      print("🚫 Cannot play games in the future")
       return
     }
 
     guard let level = levelManager.getLevelForDate(selectedDate, gameType: gameType) else {
-      print("❌ No level available for \(gameType.displayName)")
       return
     }
 
@@ -163,7 +155,6 @@ struct TabBar: View {
 
     // Final safety check for daily games
     if case .daily = context, isGameComplete {
-      print("🚫 Preventing launch of completed daily game")
       return
     }
 
@@ -198,7 +189,6 @@ struct TabBar: View {
 }
 
 // MARK: - Preview
-
 #Preview {
   let config = ModelConfiguration(isStoredInMemoryOnly: true)
   let container = try! ModelContainer(for: DailyCompletion.self, GameProgress.self, configurations: config)

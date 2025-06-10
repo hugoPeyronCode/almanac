@@ -463,7 +463,6 @@ struct PipeLevelTestView: View {
     ZStack {
       if let game = game {
         VStack(spacing: 20) {
-          // Header with close button
           HStack {
             CloseButton {
               dismiss()

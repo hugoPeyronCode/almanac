@@ -121,7 +121,7 @@ struct CalendarDayView: View {
               .trim(from: 0, to: progress)
               .stroke(
                 LinearGradient(
-                  colors: selectedGamesColors,
+                  colors: [.primary],
                   startPoint: UnitPoint.topLeading,
                   endPoint: UnitPoint.bottomTrailing
                 ),
@@ -166,9 +166,9 @@ struct CalendarDayView: View {
               startPoint: UnitPoint.top,
               endPoint: UnitPoint.bottom
             ),
-            lineWidth: 3
+            lineWidth: 2
           )
-          .frame(width: 48, height: 48)
+          .frame(width: 40, height: 40)
           .shadow(color: Color.blue.opacity(0.3), radius: 4)
       }
     }

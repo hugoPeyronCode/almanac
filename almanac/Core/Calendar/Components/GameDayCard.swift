@@ -177,25 +177,35 @@ struct GameDayCard: View {
   }
 
   private var completedButton: some View {
-    Image(systemName: "checkmark.circle.fill")
+    Image(systemName: "checkmark")
       .font(.system(size: 28))
-      .foregroundStyle(.white)
-      .background(
-        Circle()
-          .fill(gameType.color)
-          .frame(width: 50, height: 50)
-      )
+      .foregroundStyle(gameType.color)
+//      .background(
+//        Circle()
+//          .fill(gameType.color.opacity(0.5))
+//          .frame(width: 50, height: 50)
+//          .overlay(content: {
+//            Circle()
+//              .stroke(lineWidth: 1)
+//              .foregroundStyle(gameType.color)
+//          })
+//      )
   }
 
   private var playButton: some View {
     Button(action: onTap) {
       Image(systemName: "play.fill")
         .font(.system(size: 16))
-        .foregroundStyle(.white)
+        .foregroundStyle(Color.primary)
         .frame(width: 50, height: 50)
         .background(
           Circle()
-            .fill(gameType.color)
+            .fill(gameType.color.opacity(0.5))
+            .overlay(content: {
+              Circle()
+                .stroke(lineWidth: 1)
+                .foregroundStyle(gameType.color)
+            })
         )
     }
     .sensoryFeedback(.impact(weight: .medium), trigger: false)

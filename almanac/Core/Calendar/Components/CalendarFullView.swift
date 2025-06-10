@@ -76,7 +76,7 @@ struct CalendarFullView: View {
             .navigationTitle("Calendrier")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
+              ToolbarItem(placement: .topBarLeading) {
                     CloseButton {
                         dismiss()
                     }

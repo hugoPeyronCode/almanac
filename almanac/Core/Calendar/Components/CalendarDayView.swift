@@ -58,11 +58,12 @@ struct CalendarDayView: View {
     VStack(spacing: 8) {
       ZStack {
         Circle()
-          .fill(isToday ? .ultraThinMaterial : .thinMaterial)
+          .fill(isSelected ? .thickMaterial : .ultraThinMaterial)
           .frame(width: 36, height: 36)
           .overlay(
             Circle()
               .stroke(isSelected ? Color.primary : Color.clear, lineWidth: 2)
+              .scaleEffect(-0.7)
           )
           .overlay(progressRing)
           .overlay(todayHighlight)

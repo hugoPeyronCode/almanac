@@ -12,7 +12,6 @@ import SwiftUI
 /// Copie locale de PipeLevelData pour éviter les conflits d'import
 struct PipeLevelInfo {
     let id: String
-    let difficulty: Int
     let gridSize: Int
     let pipes: [PipeInfo]
     
@@ -33,8 +32,7 @@ extension PipeLevelInfo {
     init?(from level: AnyGameLevel) {
         // Pour l'instant, utilise des valeurs par défaut basées sur la difficulté
         self.id = level.id
-        self.difficulty = level.difficulty
-        self.gridSize = max(4, min(6, 3 + level.difficulty))
+        self.gridSize = max(4, min(6, 3))
         self.pipes = [] // Sera généré procéduralement
     }
 }
@@ -245,8 +243,7 @@ class PipeGame {
         if !levelInfo.pipes.isEmpty {
             loadLevelFromData(levelInfo)
         } else {
-            // Sinon génère un niveau basé sur la difficulté
-            generateLevelForDifficulty(levelInfo.difficulty)
+          print("Error could not load level")
         }
     }
     
@@ -265,21 +262,6 @@ class PipeGame {
         fillEmptyCells()
         scrambleRotations()
     }
-    
-    /// Génère un niveau basé sur la difficulté
-    private func generateLevelForDifficulty(_ difficulty: Int) {
-        switch difficulty {
-        case 1:
-            generateSimpleLevel()
-        case 2:
-            generateMediumLevel()
-        case 3...:
-            generateHardLevel()
-        default:
-            generateSimpleLevel()
-        }
-    }
-    
     /// Niveau simple (difficulté 1)
     private func generateSimpleLevel() {
         grid = Array(repeating: Array(repeating: PipePiece(type: .deadEnd), count: gridSize), count: gridSize)

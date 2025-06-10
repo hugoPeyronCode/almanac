@@ -706,7 +706,6 @@ class DictionaryManager {
 #Preview("Wordle Game") {
     let mockLevel = try! AnyGameLevel(WordleLevelData(
         id: "wordle_daily_1",
-        difficulty: 3,
         targetWord: "SWIFT",
         maxAttempts: 5
     ))

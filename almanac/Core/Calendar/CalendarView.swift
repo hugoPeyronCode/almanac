@@ -117,9 +117,6 @@ struct CalendarView: View {
         Text("You've completed all \(viewModel.selectedGames.count) selected games for \(viewModel.selectedDateTitle)! 🏆")
       }
     }
-    .sheet(item: $coordinator.presentedSheet) { destination in
-      handleSheet(destination)
-    }
     .fullScreenCover(item: $coordinator.presentedFullScreen) { destination in
       handleFullScreen(destination)
     }
@@ -139,17 +136,6 @@ struct CalendarView: View {
     }
   }
 
-  // MARK: - Sheet Handling
-
-  @ViewBuilder
-  private func handleSheet(_ destination: GameCoordinator.SheetDestination) -> some View {
-    switch destination {
-    case .gameSelection(let date):
-      GameSelectionSheet(date: date)
-        .environment(coordinator)
-        .presentationBackground(.ultraThinMaterial)
-    }
-  }
 
   // MARK: - Full Screen Handling
 

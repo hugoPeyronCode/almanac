@@ -44,8 +44,7 @@ class SetsGameViewModel {
   // MARK: - Computed Properties
 
   var contextSubtitle: String {
-    let difficulty = ["Easy", "Medium", "Hard", "Expert", "Master"][min(session.level.difficulty - 1, 4)]
-    return "\(difficulty) • Find 6 sets"
+    return "• Find 6 sets"
   }
 
   var formattedDuration: String {
@@ -551,7 +550,6 @@ class SetsGame {
   func loadLevel(_ levelData: SetsLevelData) {
     targetSets = 6
     setupNewGame()
-    print("✅ Loaded Sets level: difficulty \(levelData.difficulty), target: 6 sets")
   }
 
   func setupNewGame() {
@@ -755,7 +753,7 @@ enum SetCount: Int, CaseIterable {
 
 // Preview
 #Preview("Sets Game - Daily Challenge") {
-  let mockLevel = try! AnyGameLevel(SetsLevelData(id: "sets_daily_1", difficulty: 3))
+  let mockLevel = try! AnyGameLevel(SetsLevelData(id: "sets_daily_1"))
 
   let session = GameSession(
     gameType: .sets,

@@ -47,6 +47,8 @@ struct GameListItem: View {
   let progressData: [GameProgress]
   let progressManager: ProgressManager?
 
+  private let calendar = Calendar.current
+
   var body: some View {
     VStack(spacing: 8) {
       GameDayCard(
@@ -59,22 +61,12 @@ struct GameListItem: View {
           completions: completions
         ),
         progress: getGameProgress(gameType),
+        completionTime: getCompletionTimeForDate(viewModel.selectedDate, gameType: gameType),
         canPlay: viewModel.canPlayGame(for: viewModel.selectedDate),
         onTap: {
           handleGameTap()
         }
       )
-
-      // Debug completion button
-      if !viewModel.isGameCompletedForDate(viewModel.selectedDate, gameType: gameType, completions: completions)
-          && viewModel.canPlayGame(for: viewModel.selectedDate) {
-        DebugCompletionButton(
-          gameType: gameType,
-          date: viewModel.selectedDate,
-          viewModel: viewModel,
-          progressManager: progressManager
-        )
-      }
     }
   }
 
@@ -93,6 +85,20 @@ struct GameListItem: View {
 
   private func getGameProgress(_ gameType: GameType) -> GameProgress? {
     return progressData.first { $0.gameType == gameType }
+  }
+
+  private func getCompletionTimeForDate(_ date: Date, gameType: GameType) -> TimeInterval? {
+    let startOfDay = calendar.startOfDay(for: date)
+    let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay)!
+
+    // Find the completion for this specific date and game type
+    let completion = completions.first { completion in
+      completion.gameType == gameType &&
+      completion.date >= startOfDay &&
+      completion.date < endOfDay
+    }
+
+    return completion?.completionTime
   }
 }
 

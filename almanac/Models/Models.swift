@@ -53,7 +53,6 @@ enum GameType: String, CaseIterable, Codable {
 
 protocol GameLevelData: Codable {
     var id: String { get }
-    var difficulty: Int { get }
 }
 
 // Generic container for all game levels
@@ -65,12 +64,10 @@ struct GameLevelsContainer: Codable {
 // Type-erased wrapper for different game level types
 struct AnyGameLevel: Codable {
     let id: String
-    let difficulty: Int
     let gameData: Data
 
     init<T: GameLevelData>(_ level: T) throws {
         self.id = level.id
-        self.difficulty = level.difficulty
         self.gameData = try JSONEncoder().encode(level)
     }
 
@@ -87,7 +84,6 @@ final class GameLevel {
     var gameType: GameType
     var date: Date
     var levelDataId: String
-    var difficulty: Int
     var isCompleted: Bool
     var completionTime: TimeInterval?
     var completedAt: Date?
@@ -97,7 +93,6 @@ final class GameLevel {
         self.gameType = gameType
         self.date = date
         self.levelDataId = levelDataId
-        self.difficulty = difficulty
         self.isCompleted = false
         self.completionTime = nil
         self.completedAt = nil

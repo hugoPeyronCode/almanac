@@ -471,7 +471,7 @@ extension GameSession {
     let setsGame = SetsGame()
 
     if gameType == .sets {
-      let levelData = SetsLevelData(id: level.id, difficulty: level.difficulty)
+      let levelData = SetsLevelData(id: level.id)
       setsGame.loadLevel(levelData)
     }
 

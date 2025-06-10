@@ -66,7 +66,6 @@ class LevelManager {
             case .shikaku:
                 let shikakuLevel = ShikakuLevelData(
                     id: level.id,
-                    difficulty: level.difficulty,
                     gridRows: level.gridRows,
                     gridCols: level.gridCols,
                     clues: level.clues.map { clue in
@@ -82,7 +81,6 @@ class LevelManager {
             case .pipe:
                 let pipeLevel = PipeLevelData(
                     id: level.id,
-                    difficulty: level.difficulty,
                     gridSize: max(level.gridRows, level.gridCols),
                     pipes: [] // Convert clues to pipes if needed
                 )
@@ -91,7 +89,6 @@ class LevelManager {
             case .wordle:
                 let wordleLevel = WordleLevelData(
                     id: level.id,
-                    difficulty: level.difficulty,
                     targetWord: generateWordFromId(level.id),
                     maxAttempts: 6
                 )
@@ -99,8 +96,7 @@ class LevelManager {
 
             case .sets:
                 let setsLevel = SetsLevelData(
-                    id: level.id,
-                    difficulty: level.difficulty
+                    id: level.id
                 )
                 return try AnyGameLevel(setsLevel)
             }
@@ -121,29 +117,25 @@ class LevelManager {
                 case .shikaku:
                     levelData = ShikakuLevelData(
                         id: "shikaku_\(i)",
-                        difficulty: difficulty,
-                        gridRows: 6 + difficulty,
-                        gridCols: 4 + difficulty,
+                        gridRows: 6 ,
+                        gridCols: 4,
                         clues: generateMockClues(gridRows: 6 + difficulty, gridCols: 4 + difficulty)
                     )
                 case .pipe:
                     levelData = PipeLevelData(
                         id: "pipe_\(i)",
-                        difficulty: difficulty,
-                        gridSize: 4 + difficulty,
+                        gridSize: 4,
                         pipes: []
                     )
                 case .wordle:
                     levelData = WordleLevelData(
                         id: "wordle_\(i)",
-                        difficulty: difficulty,
                         targetWord: generateRandomWord(difficulty: difficulty),
                         maxAttempts: 6
                     )
                 case .sets:
                     levelData = SetsLevelData(
-                        id: "sets_\(i)",
-                        difficulty: difficulty
+                        id: "sets_\(i)"
                     )
                 }
 
@@ -280,7 +272,6 @@ class LevelManager {
             do {
                 let wordleLevel = WordleLevelData(
                     id: levelId,
-                    difficulty: 3,
                     targetWord: dailyWord,
                     maxAttempts: 5
                 )
@@ -390,16 +381,6 @@ class LevelManager {
     func getTotalLevelsCount(for gameType: GameType) -> Int {
         return gameLevels[gameType]?.count ?? 0
     }
-
-    func getDifficultyDistribution(for gameType: GameType) -> [Int: Int] {
-        guard let levels = gameLevels[gameType] else { return [:] }
-
-        var distribution: [Int: Int] = [:]
-        for level in levels {
-            distribution[level.difficulty, default: 0] += 1
-        }
-        return distribution
-    }
 }
 
 // MARK: - JSON Data Structures for Parsing
@@ -426,7 +407,6 @@ struct ClueData: Codable {
 
 struct ShikakuLevelData: GameLevelData {
     let id: String
-    let difficulty: Int
     let gridRows: Int
     let gridCols: Int
     let clues: [ClueData]
@@ -440,7 +420,6 @@ struct ShikakuLevelData: GameLevelData {
 
 struct PipeLevelData: GameLevelData {
     let id: String
-    let difficulty: Int
     let gridSize: Int
     let pipes: [PipeData]
 
@@ -457,13 +436,11 @@ struct PipeLevelData: GameLevelData {
 
 struct BinarioLevelData: GameLevelData {
     let id: String
-    let difficulty: Int
     let gridSize: Int
     let initialGrid: [[Int?]]
 
     init(id: String, difficulty: Int, gridSize: Int, initialGrid: [[Int?]]) {
         self.id = id
-        self.difficulty = difficulty
         self.gridSize = gridSize
         self.initialGrid = initialGrid.isEmpty ? Array(repeating: Array(repeating: nil, count: gridSize), count: gridSize) : initialGrid
     }
@@ -473,22 +450,8 @@ struct BinarioLevelData: GameLevelData {
 
 struct SetsLevelData: GameLevelData {
     let id: String
-    let difficulty: Int
-    let targetSets: Int
-
-    init(id: String, difficulty: Int) {
+    init(id: String) {
         self.id = id
-        self.difficulty = difficulty
-
-        // Target sets based on difficulty
-        switch difficulty {
-        case 1: self.targetSets = 5
-        case 2: self.targetSets = 8
-        case 3: self.targetSets = 12
-        case 4: self.targetSets = 16
-        case 5: self.targetSets = 20
-        default: self.targetSets = 10
-        }
     }
 }
 
@@ -496,7 +459,6 @@ struct SetsLevelData: GameLevelData {
 
 struct WordleLevelData: GameLevelData {
     let id: String
-    let difficulty: Int
     let targetWord: String
     let maxAttempts: Int
 }

@@ -5,7 +5,6 @@
 //  Created by Hugo Peyron on 09/06/2025.
 //
 
-
 import SwiftUI
 
 struct GameDayCard: View {
@@ -19,166 +18,190 @@ struct GameDayCard: View {
   let onMarkComplete: (() -> Void)? = nil // Always nil now
 
   var body: some View {
-    VStack(spacing: 0) {
-      topSection
-        .padding(.top, 16)
-        .padding(.horizontal, 16)
-
-      Spacer()
-
-      bottomSection
-        .padding(16)
-        .background(gameType.color.opacity(0.1))
-        .clipShape(RoundedRectangle(cornerRadius: 16))
+    ZStack {
+      HStack(spacing: 0) {
+        leftSection
+        Spacer()
+        rightSection
+      }
+      gameIcon
     }
+    .padding(.leading, 16)
+    .padding(.trailing, 8)
+    .padding(.vertical, 12)
     .frame(height: 100)
     .frame(maxWidth: .infinity)
-    .background(
-      RoundedRectangle(cornerRadius: 16)
-        .fill(.thinMaterial)
-        .shadow(color: .primary.opacity(0.05), radius: 8, y: 4)
-    )
-    .overlay(
-      RoundedRectangle(cornerRadius: 16)
-        .stroke(
-          !canPlay ? .orange.opacity(0.5) : isCompleted ? .gray.opacity(0.3) : gameType.color,
-          lineWidth: !canPlay ? 1 : isCompleted ? 0.5 : 1
-        )
-    )
+    .background(cardBackground)
+    .overlay(cardBorder)
     .opacity(canPlay ? 1.0 : 0.6)
-    .overlay(
-      Group {
-        if isCompleted {
-          VStack {
-            HStack {
-              Spacer()
-              Image(systemName: "checkmark.circle.fill")
-                .font(.title2)
-                .foregroundStyle(gameType.color)
-            }
-            .padding(.top, 12)
-            .padding(.trailing, 12)
-            Spacer()
-          }
-        }
-      }
-    )
     .sensoryFeedback(.impact(weight: .medium), trigger: false)
   }
 
-  private var topSection: some View {
-    VStack(spacing: 12) {
-      HStack {
-        Image(systemName: gameType.icon)
-          .font(.title2)
-          .foregroundStyle(gameType.color)
+  // MARK: - Card Background & Border
 
-        Text(gameType.displayName)
-          .font(.headline)
-          .fontWeight(.medium)
-          .foregroundStyle(.primary)
-          .frame(maxWidth: .infinity, alignment: .leading)
+  private var cardBackground: some View {
+    RoundedRectangle(cornerRadius: 16)
+      .foregroundStyle(gameType.color.opacity(0.15))
+      .shadow(color: .primary.opacity(0.05), radius: 8, y: 4)
+  }
 
-        Spacer()
+  private var cardBorder: some View {
+    RoundedRectangle(cornerRadius: 16)
+      .stroke(
+        !canPlay ? .orange.opacity(0.5) : isCompleted ? .gray.opacity(0.3) : gameType.color,
+        lineWidth: !canPlay ? 1 : isCompleted ? 0.5 : 1
+      )
+  }
+
+  // MARK: - Left Section
+
+  private var leftSection: some View {
+    VStack(alignment: .leading, spacing: 8) {
+      gameTitle
+      Spacer()
+      bottomLeftInfo
+    }
+  }
+
+  private var gameTitle: some View {
+    Text(gameType.displayName)
+      .font(.headline)
+      .fontWeight(.medium)
+      .foregroundStyle(.primary)
+  }
+
+  private var bottomLeftInfo: some View {
+    HStack(spacing: 20) {
+      levelInfo
+      streakIndicator
+    }
+  }
+
+  // MARK: - Level Information
+
+  private var levelInfo: some View {
+    Group {
+      if let level = level {
+        VStack(alignment: .leading, spacing: 4) {
+          difficultyStars(for: level.difficulty)
+          bestTimeLabel
+        }
+      } else {
+        VStack(alignment: .leading, spacing: 4) {
+          difficultyStars(for: 1)
+          noLevelLabel
+        }
       }
     }
   }
 
-  private var bottomSection: some View {
-    HStack(spacing: 12) {
-      // Level info with stars and player time
-      HStack {
-        if let level = level {
-          VStack(alignment: .leading, spacing: 4) {
-            DifficultyStars(difficulty: level.difficulty, size: 10, spacing: 1)
+  private func difficultyStars(for difficulty: Int) -> some View {
+    DifficultyStars(difficulty: difficulty, size: 10, spacing: 1)
+  }
 
-            // Player's best time (if available)
-            if let progress = progress, let bestTime = progress.bestTime {
-              Text("\(formatTime(bestTime))")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-            } else {
-              Text("No time yet")
-                .font(.caption2)
-                .foregroundStyle(.tertiary)
-            }
-          }
-        } else {
-          VStack(alignment: .leading, spacing: 4) {
-            DifficultyStars(difficulty: 1, size: 10, spacing: 1)
-
-            Text("No level available")
-              .font(.caption2)
-              .foregroundStyle(.secondary)
-          }
-        }
-
-        Spacer()
-
-        if !canPlay {
-          VStack(alignment: .trailing, spacing: 2) {
-            HStack(spacing: 2) {
-              Image(systemName: "clock.badge.xmark")
-                .font(.caption)
-                .foregroundStyle(.orange)
-            }
-            Text("Non disponible")
-              .font(.caption2)
-              .foregroundStyle(.orange)
-          }
-        } else if let progress = progress, progress.currentStreak > 0 {
-          VStack(alignment: .trailing, spacing: 2) {
-            HStack(spacing: 2) {
-              Image(systemName: "flame.fill")
-                .font(.system(size: 10))
-                .foregroundStyle(.orange)
-              Text("\(progress.currentStreak)")
-                .font(.caption)
-                .foregroundStyle(.orange)
-                .fontWeight(.medium)
-            }
-
-            Text("streak")
-              .font(.caption2)
-              .foregroundStyle(.tertiary)
-          }
-        }
+  private var bestTimeLabel: some View {
+    Group {
+      if let progress = progress, let bestTime = progress.bestTime {
+        Text("\(formatTime(bestTime))")
+          .font(.caption2)
+          .foregroundStyle(.secondary)
+      } else {
+        Text("No time yet")
+          .font(.caption2)
+          .foregroundStyle(.tertiary)
       }
+    }
+  }
 
-      HStack {
-        if isCompleted {
-          HStack(spacing: 6) {
-            Text("Completed")
-              .font(.caption)
-              .fontWeight(.medium)
-              .foregroundStyle(Color.primary)
-          }
-          .frame(maxWidth: 100)
-          .padding(.vertical, 8)
-          .background(
-            RoundedRectangle(cornerRadius: 8)
-              .fill(gameType.color.opacity(0.1))
-          )
-        } else {
-          // Single Play button
-          Button(action: onTap) {
-            HStack(spacing: 4) {
-              Image(systemName: "play.fill")
-                .font(.caption)
-              Text("Play")
-                .font(.caption)
-                .fontWeight(.medium)
-            }
-            .foregroundStyle(.background)
-            .frame(minWidth: 100)
-            .padding(.vertical, 8)
-            .background(gameType.color, in: RoundedRectangle(cornerRadius: 8))
-          }
-          .sensoryFeedback(.impact(weight: .medium), trigger: false)
+  private var noLevelLabel: some View {
+    Text("No level available")
+      .font(.caption2)
+      .foregroundStyle(.secondary)
+  }
+
+  // MARK: - Streak Indicator
+
+  private var streakIndicator: some View {
+    Group {
+      if let progress = progress, progress.currentStreak > 0 {
+        VStack(alignment: .leading, spacing: 2) {
+          streakCount
+          streakLabel
         }
       }
     }
   }
+
+  private var streakCount: some View {
+    HStack(spacing: 2) {
+      Image(systemName: "flame.fill")
+        .font(.system(size: 10))
+      Text("\(progress?.currentStreak ?? 0)")
+        .font(.caption)
+        .fontWeight(.medium)
+    }
+    .foregroundStyle(.primary)
+  }
+
+  private var streakLabel: some View {
+    Text("streak")
+      .font(.caption2)
+      .foregroundStyle(.secondary)
+  }
+
+  // MARK: - Right Section
+
+  private var rightSection: some View {
+    ZStack {
+      actionButton
+    }
+    .frame(width: 80, height: 76)
+  }
+
+  private var gameIcon: some View {
+    Image(systemName: gameType.icon)
+      .font(.system(size: 50))
+      .foregroundStyle(gameType.color.opacity(0.3))
+  }
+
+  // MARK: - Action Button
+
+  private var actionButton: some View {
+    Group {
+      if isCompleted {
+        completedButton
+      } else {
+        playButton
+      }
+    }
+  }
+
+  private var completedButton: some View {
+    Image(systemName: "checkmark.circle.fill")
+      .font(.system(size: 28))
+      .foregroundStyle(.white)
+      .background(
+        Circle()
+          .fill(gameType.color)
+          .frame(width: 50, height: 50)
+      )
+  }
+
+  private var playButton: some View {
+    Button(action: onTap) {
+      Image(systemName: "play.fill")
+        .font(.system(size: 16))
+        .foregroundStyle(.white)
+        .frame(width: 50, height: 50)
+        .background(
+          Circle()
+            .fill(gameType.color)
+        )
+    }
+    .sensoryFeedback(.impact(weight: .medium), trigger: false)
+  }
+
+  // MARK: - Helper Functions
 
   private func formatTime(_ seconds: TimeInterval) -> String {
     let minutes = Int(seconds) / 60
@@ -192,9 +215,10 @@ struct GameDayCard: View {
   }
 }
 
+// MARK: - Previews
 
 #Preview("GameDayCard - All Game Types") {
-  LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 16), count: 2), spacing: 16) {
+  LazyVStack(spacing: 12) {
     ForEach(GameType.allCases, id: \.self) { gameType in
       let mockLevel = createMockLevel(for: gameType)
       let mockProgress = createMockProgress(for: gameType)
@@ -228,22 +252,11 @@ struct GameDayCard: View {
         print("Future game tapped")
       }
     )
-
-    GameDayCard(
-      gameType: .shikaku,
-      date: Date(),
-      level: createMockLevel(for: .shikaku),
-      isCompleted: true,
-      progress: createMockProgress(for: .shikaku),
-      canPlay: true,
-      onTap: {
-        print("Today game tapped")
-      }
-    )
   }
   .padding()
 }
 
+// MARK: - Mock Data Helpers
 
 private func createMockProgress(for gameType: GameType) -> GameProgress? {
   // 70% chance of having progress
@@ -258,7 +271,6 @@ private func createMockProgress(for gameType: GameType) -> GameProgress? {
 
   return progress
 }
-
 
 private func createMockLevel(for gameType: GameType) -> AnyGameLevel {
   do {

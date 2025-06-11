@@ -113,6 +113,7 @@ struct SetsGameView: View {
         if viewModel.isGameComplete {
           GameCompletionView(
             isGameLost: viewModel.game.isGameOver,
+            potentialRightAnswer: "",
             formattedDuration: viewModel.formattedDuration,
             coordinator: coordinator,
             session: viewModel.session

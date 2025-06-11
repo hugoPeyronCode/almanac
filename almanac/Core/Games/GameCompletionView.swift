@@ -9,6 +9,7 @@ import SwiftUI
 
 struct GameCompletionView: View {
   let isGameLost: Bool
+  let potentialRightAnswer: String
   let formattedDuration: String
   let coordinator: GameCoordinator
   let session: GameSession
@@ -22,7 +23,8 @@ struct GameCompletionView: View {
     return false
   }
 
-  init(isGameLost: Bool, formattedDuration: String, coordinator: GameCoordinator, session: GameSession) {
+  init(isGameLost: Bool, potentialRightAnswer: String, formattedDuration: String, coordinator: GameCoordinator, session: GameSession) {
+    self.potentialRightAnswer = potentialRightAnswer
     self.isGameLost = isGameLost
     self.formattedDuration = formattedDuration
     self.coordinator = coordinator
@@ -30,6 +32,7 @@ struct GameCompletionView: View {
   }
 
   init(formattedDuration: String, coordinator: GameCoordinator, session: GameSession) {
+    self.potentialRightAnswer = ""
     self.isGameLost = false
     self.formattedDuration = formattedDuration
     self.coordinator = coordinator
@@ -38,7 +41,7 @@ struct GameCompletionView: View {
 
   var body: some View {
     ZStack {
-      // Background overlay
+
       Rectangle()
         .fill(.black.opacity(0.3))
         .ignoresSafeArea()
@@ -57,14 +60,25 @@ struct GameCompletionView: View {
             .scaleEffect(isVisible ? 1.0 : 0.3)
             .animation(.spring(duration: 0.6).delay(0.2), value: isVisible)
 
-          // Time text with slide animation
-          Text("\(isGameLost ? "Time played" : "Completed in") \(formattedDuration)")
-            .font(.title2)
-            .fontWeight(.medium)
-            .foregroundStyle(.primary)
-            .opacity(isVisible ? 1 : 0)
-            .offset(y: isVisible ? 0 : 20)
-            .animation(.easeOut(duration: 0.4).delay(0.4), value: isVisible)
+          VStack(alignment: isGameLost ?.leading : .center) {
+            Text("\(isGameLost ? "Time played" : "Completed in") \(formattedDuration)")
+              .font(.title2)
+              .fontWeight(.medium)
+              .foregroundStyle(.primary)
+              .opacity(isVisible ? 1 : 0)
+              .offset(y: isVisible ? 0 : 20)
+              .animation(.easeOut(duration: 0.4).delay(0.4), value: isVisible)
+
+            if isGameLost && potentialRightAnswer != "" {
+              Text("Today's word was \(potentialRightAnswer)")
+                .font(.title2)
+                .fontWeight(.medium)
+                .foregroundStyle(.primary)
+                .opacity(isVisible ? 1 : 0)
+                .offset(y: isVisible ? 0 : 20)
+                .animation(.easeOut(duration: 0.4).delay(0.4), value: isVisible)
+            }
+          }
 
           // Action buttons with stagger animation
           VStack(spacing: 12) {

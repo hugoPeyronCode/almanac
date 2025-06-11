@@ -27,7 +27,6 @@ struct CalendarDateHeader: View {
               .font(.caption)
               .foregroundStyle(.orange)
           }
-
         }
       }
       .contentTransition(.numericText())
@@ -38,8 +37,6 @@ struct CalendarDateHeader: View {
       if let progress = dayProgress {
         DayProgressBar(progress: progress)
       }
-
-
     }
   }
 }

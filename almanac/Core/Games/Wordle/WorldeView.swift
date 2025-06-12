@@ -2,7 +2,7 @@
 //  WorldeView.swift
 //  almanac
 //
-//  Created by Hugo Peyron on 04/06/2025.
+//  Updated with state persistence
 //
 
 import SwiftUI
@@ -15,6 +15,7 @@ struct WordleGameView: View {
   @State private var showExitConfirmation = false
   @State private var gameTimer = GameTimer()
   @State private var showInvalidWordAlert = false
+  @State private var game: WordleGame?
 
   init(session: GameSession) {
     self._session = State(initialValue: session)
@@ -25,99 +26,123 @@ struct WordleGameView: View {
       ZStack {
         backgroundGradient
 
-        VStack(spacing: 20) {
-          GameHeaderView(
-            session: session,
-            showExitConfirmation: $showExitConfirmation,
-            gameTimer: gameTimer
-          ) {
-            gameTimer.stopTimer()
-            coordinator.dismissFullScreen()
+        if let game = game {
+          VStack(spacing: 20) {
+            GameHeaderView(
+              session: session,
+              showExitConfirmation: $showExitConfirmation,
+              gameTimer: gameTimer
+            ) {
+              // Save state before dismissing
+              saveGameState()
+              gameTimer.stopTimer()
+              coordinator.dismissFullScreen()
+            }
+
+            Spacer()
+
+            gameContent(game: game, in: geometry)
+
+            keyboardView(game: game)
+              .padding(.bottom, 8)
+          }
+          .padding(.horizontal)
+          .padding(.top, 8)
+
+          if game.isGameComplete {
+            GameCompletionView(
+              isGameLost: !game.isGameWon,
+              potentialRightAnswer: game.targetWord,
+              formattedDuration: session.formattedPlayTime,
+              coordinator: coordinator,
+              session: session
+            )
+            .ignoresSafeArea()
           }
 
-          Spacer()
-
-          gameContent(in: geometry)
-
-          keyboardView
-            .padding(.bottom, 8)
-        }
-        .padding(.horizontal)
-        .padding(.top, 8)
-
-        if session.wordleGame.isGameComplete {
-          GameCompletionView(
-            isGameLost: !session.wordleGame.isGameWon,
-            potentialRightAnswer: session.wordleGame.targetWord,
-            formattedDuration: session.formattedPlayTime,
-            coordinator: coordinator,
-            session: session
-          )
-          .ignoresSafeArea()
-        }
-
-        VStack {
-          Text(session.wordleGame.targetWord)
-          DebugCompleteButton(session: session, label: "Force Win")
-            .disabled(session.isCompleted)
-            .padding(.bottom, 8)
-          Spacer()
+          VStack {
+            Text(game.targetWord)
+            DebugCompleteButton(session: session, label: "Force Win")
+              .disabled(session.isCompleted)
+              .padding(.bottom, 8)
+            Spacer()
+          }
+        } else {
+          ProgressView("Loading...")
         }
       }
     }
     .navigationBarHidden(true)
-    .onChange(of: session.wordleGame.isGameComplete) { _, isComplete in
+    .onChange(of: game?.isGameComplete ?? false) { _, isComplete in
       if isComplete && !session.isCompleted {
         handleGameCompletion()
       }
     }
+    .onChange(of: game?.guesses ?? []) { _, _ in
+      // Auto-save when guesses change
+      saveGameState()
+    }
     .onAppear {
+      // Initialize the game with model context
+      game = session.initializeWordleGame(with: modelContext)
+
       gameTimer.displayTime = session.actualPlayTime
       gameTimer.startTimer()
     }
     .onDisappear {
       gameTimer.stopTimer()
 
-      if !session.wordleGame.isGameComplete {
+      if !(game?.isGameComplete ?? true) {
         session.pause()
         gameTimer.pause()
+        saveGameState()
       }
 
-      session.cleanupWordleGameInstance()
+      // Don't cleanup if game is not complete - preserve instance
+      if game?.isGameComplete ?? false {
+        session.cleanupWordleGameInstance()
+      }
     }
     .confirmationDialog("Exit Game", isPresented: $showExitConfirmation) {
       Button("Exit", role: .destructive) {
+        saveGameState()
         coordinator.dismissFullScreen()
       }
       Button("Cancel", role: .cancel) { }
     } message: {
-      Text("Are you sure you want to exit? Progress will be lost.")
+      Text("Are you sure you want to exit? Progress will be saved.")
     }
     .alert("Invalid Word", isPresented: $showInvalidWordAlert) {
       Button("OK", role: .cancel) { }
     } message: {
-      Text("'\(session.wordleGame.currentAttempt)' is not in the word list")
+      Text("'\(game?.currentAttempt ?? "")' is not in the word list")
     }
+  }
+
+  // MARK: - State Management
+
+  private func saveGameState() {
+    session.saveWordleGameState(modelContext: $modelContext)
   }
 
   // MARK: - Game Content
 
-  private func gameContent(in geometry: GeometryProxy) -> some View {
+  private func gameContent(game: WordleGame, in geometry: GeometryProxy) -> some View {
     VStack(spacing: 16) {
       // Game stats
-      gameStatsView
+      gameStatsView(game: game)
 
       // Word grid
-      wordGridView
+      wordGridView(game: game)
         .frame(maxWidth: min(geometry.size.width - 32, 350)) // Limit max width
     }
     .frame(maxWidth: .infinity)
   }
 
-  private var gameStatsView: some View {
+  private func gameStatsView(game: WordleGame) -> some View {
     HStack(spacing: 30) {
       VStack(spacing: 4) {
-        Text("\(session.wordleGame.guesses.count)")
+        Text("\(game.guesses.count)")
           .font(.title3)
           .fontWeight(.bold)
           .monospacedDigit()
@@ -129,7 +154,7 @@ struct WordleGameView: View {
       }
 
       VStack(spacing: 4) {
-        Text("\(session.wordleGame.maxAttempts)")
+        Text("\(game.maxAttempts)")
           .font(.title3)
           .fontWeight(.bold)
           .monospacedDigit()
@@ -141,7 +166,7 @@ struct WordleGameView: View {
       }
 
       VStack(spacing: 4) {
-        Text("\(session.wordleGame.targetWord.count)")
+        Text("\(game.targetWord.count)")
           .font(.title3)
           .fontWeight(.bold)
           .monospacedDigit()
@@ -156,18 +181,18 @@ struct WordleGameView: View {
     .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
   }
 
-  private var wordGridView: some View {
+  private func wordGridView(game: WordleGame) -> some View {
     GeometryReader { geometry in
       let letterSize = calculateLetterSize(in: geometry)
 
       ScrollView {
-        ForEach(0..<session.wordleGame.maxAttempts, id: \.self) { row in
+        ForEach(0..<game.maxAttempts, id: \.self) { row in
           HStack(spacing: 0) {
-            ForEach(0..<session.wordleGame.targetWord.count, id: \.self) { col in
+            ForEach(0..<game.targetWord.count, id: \.self) { col in
               WordleLetterView(
-                letter: getLetterForPosition(row: row, col: col),
-                state: getLetterState(row: row, col: col),
-                game: session.wordleGame,
+                letter: getLetterForPosition(game: game, row: row, col: col),
+                state: getLetterState(game: game, row: row, col: col),
+                game: game,
                 size: letterSize
               )
               .padding(.horizontal, 3)
@@ -193,47 +218,47 @@ struct WordleGameView: View {
 
   // MARK: - Keyboard
 
-  private var keyboardView: some View {
+  private func keyboardView(game: WordleGame) -> some View {
     WordleKeyboardView(
-      game: session.wordleGame,
+      game: game,
       onLetterTap: { letter in
-        session.wordleGame.addLetter(letter)
+        game.addLetter(letter)
       },
       onEnterTap: {
-        if session.wordleGame.currentAttempt.count == session.wordleGame.targetWord.count {
-          submitCurrentGuess()
+        if game.currentAttempt.count == game.targetWord.count {
+          submitCurrentGuess(game: game)
         }
       },
       onDeleteTap: {
-        session.wordleGame.deleteLastLetter()
+        game.deleteLastLetter()
       }
     )
   }
 
   // MARK: - Helper Methods
 
-  private func getLetterForPosition(row: Int, col: Int) -> String {
-    if row < session.wordleGame.guesses.count {
-      let guess = session.wordleGame.guesses[row]
+  private func getLetterForPosition(game: WordleGame, row: Int, col: Int) -> String {
+    if row < game.guesses.count {
+      let guess = game.guesses[row]
       if col < guess.count {
         return String(guess[guess.index(guess.startIndex, offsetBy: col)])
       }
-    } else if row == session.wordleGame.guesses.count {
+    } else if row == game.guesses.count {
       // Current attempt row
-      if col < session.wordleGame.currentAttempt.count {
-        return String(session.wordleGame.currentAttempt[session.wordleGame.currentAttempt.index(session.wordleGame.currentAttempt.startIndex, offsetBy: col)])
+      if col < game.currentAttempt.count {
+        return String(game.currentAttempt[game.currentAttempt.index(game.currentAttempt.startIndex, offsetBy: col)])
       }
     }
     return ""
   }
 
-  private func getLetterState(row: Int, col: Int) -> LetterState {
-    if row < session.wordleGame.guesses.count {
-      let guess = session.wordleGame.guesses[row]
+  private func getLetterState(game: WordleGame, row: Int, col: Int) -> LetterState {
+    if row < game.guesses.count {
+      let guess = game.guesses[row]
       if col < guess.count {
-        return getLetterStateForGuess(guess: guess, position: col, targetWord: session.wordleGame.targetWord)
+        return getLetterStateForGuess(guess: guess, position: col, targetWord: game.targetWord)
       }
-    } else if row == session.wordleGame.guesses.count && col < session.wordleGame.currentAttempt.count {
+    } else if row == game.guesses.count && col < game.currentAttempt.count {
       return .current
     }
     return .empty
@@ -255,7 +280,6 @@ struct WordleGameView: View {
     }
 
     // Check if letter is in the word but wrong position
-    // This is complex due to duplicate letter handling in Wordle
     let targetLetterCount = targetArray.filter { $0 == guessLetter }.count
     let correctPositions = zip(guessArray, targetArray).enumerated().filter { index, pair in
       pair.0 == guessLetter && pair.1 == guessLetter
@@ -272,17 +296,25 @@ struct WordleGameView: View {
     return .notInWord
   }
 
-  private func submitCurrentGuess() {
-    let guess = session.wordleGame.currentAttempt
+  private func submitCurrentGuess(game: WordleGame) {
+    let guess = game.currentAttempt
     guard DictionaryManager.shared.isValid(word: guess) else {
+      showInvalidWordAlert = true
       return
     }
-    session.wordleGame.submitGuess(guess)
+    game.submitGuess(guess)
   }
 
   private func handleGameCompletion() {
     gameTimer.stopTimer()
     session.complete()
+
+    // Clear state when game is completed
+    let stateManager = session.getWordleStateManager(modelContext: modelContext)
+    stateManager.clearState(for: session)
+
+    // Clean up the game instance
+    session.cleanupWordleGameInstance()
   }
 
   private var backgroundGradient: some View {
@@ -294,7 +326,6 @@ struct WordleGameView: View {
     .ignoresSafeArea()
   }
 }
-
 // MARK: - Supporting Views
 
 struct WordleLetterView: View {
@@ -397,37 +428,5 @@ class WordleGame {
   }
 }
 
-class DictionaryManager {
-  static let shared = DictionaryManager()
-  private var words: Set<String> = []
 
-  init() {
-    if let path = Bundle.main.path(forResource: "english_words", ofType: "txt"),
-       let content = try? String(contentsOfFile: path, encoding: .utf8) {
-      words = Set(content.components(separatedBy: .newlines).map { $0.uppercased() })
-    }
-  }
 
-  func isValid(word: String) -> Bool {
-    words.contains(word.uppercased())
-  }
-}
-
-// MARK: - Preview
-#Preview("Wordle Game") {
-  let mockLevel = try! AnyGameLevel(WordleLevelData(
-    id: "wordle_daily_1",
-    targetWord: "SWIFT",
-    maxAttempts: 6  // Changed from 5 to 6
-  ))
-
-  let session = GameSession(
-    gameType: .wordle,
-    level: mockLevel,
-    context: .daily(Date())
-  )
-
-  WordleGameView(session: session)
-    .environment(GameCoordinator())
-    .modelContainer(for: [DailyCompletion.self, GameProgress.self])
-}

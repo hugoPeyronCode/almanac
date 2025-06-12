@@ -6,72 +6,6 @@
 
 import SwiftUI
 
-// SET GAMES VIEWMODEL
-@Observable
-class SetsGameViewModel {
-  private(set) var session: GameSession
-
-  var game: SetsGame {
-    return session.setsGame
-  }
-
-  init(session: GameSession) {
-    self.session = session
-  }
-
-  // MARK: - Game Actions
-
-  func selectCard(_ card: SetCard) {
-    game.selectCard(card)
-  }
-
-  func deselectCard(_ card: SetCard) {
-    game.deselectCard(card)
-  }
-
-  func shuffleCards() {
-    game.shuffleCards()
-  }
-
-  func findHint() {
-    game.findHint()
-  }
-
-  func resetSelection() {
-    game.selectedCards = []
-  }
-
-  // MARK: - Computed Properties
-
-  var contextSubtitle: String {
-    return "• Find 6 sets"
-  }
-
-  var formattedDuration: String {
-    return session.formattedPlayTime
-  }
-
-  var isValidSetSelected: Bool {
-    guard game.selectedCards.count == 3 else { return false }
-    return game.isValidSet(game.selectedCards)
-  }
-
-  var canUseHint: Bool {
-    return game.hintsUsed < 3
-  }
-
-  // MARK: - Game State
-
-  var isGameComplete: Bool {
-    game.isGameComplete
-  }
-
-  var selectedCardsCount: Int {
-    game.selectedCards.count
-  }
-}
-
-// VIEW
 struct SetsGameView: View {
   @Environment(\.modelContext) private var modelContext
   @Environment(GameCoordinator.self) private var coordinator
@@ -79,6 +13,8 @@ struct SetsGameView: View {
   @State private var viewModel: SetsGameViewModel
   @State private var showExitConfirmation = false
   @State private var gameTimer = GameTimer()
+  @State private var showAlreadyFoundAlert = false
+  @State private var checkResult: SetsGame.CheckResult = .none
 
   init(session: GameSession) {
     self._viewModel = State(initialValue: SetsGameViewModel(session: session))
@@ -95,6 +31,8 @@ struct SetsGameView: View {
             showExitConfirmation: $showExitConfirmation,
             gameTimer: gameTimer
           ) {
+            // Save state before dismissing
+            saveGameState()
             gameTimer.stopTimer()
             coordinator.dismissFullScreen()
           }
@@ -102,7 +40,6 @@ struct SetsGameView: View {
           Spacer()
 
           gameContent(in: geometry)
-
 
           Spacer()
 
@@ -112,7 +49,7 @@ struct SetsGameView: View {
 
         if viewModel.isGameComplete {
           GameCompletionView(
-            isGameLost: viewModel.game.isGameOver,
+            isGameLost: viewModel.game?.isGameOver ?? false,
             potentialRightAnswer: "",
             formattedDuration: viewModel.formattedDuration,
             coordinator: coordinator,
@@ -129,6 +66,9 @@ struct SetsGameView: View {
       }
     }
     .onAppear {
+      // Initialize the game with model context
+      viewModel.setupGame(with: modelContext)
+
       gameTimer.displayTime = viewModel.session.actualPlayTime
       gameTimer.startTimer()
     }
@@ -138,10 +78,35 @@ struct SetsGameView: View {
       if !viewModel.isGameComplete {
         viewModel.session.pause()
         gameTimer.pause()
+        // Save state before leaving
+        viewModel.session.saveSetsGameState(modelContext: modelContext)
       }
 
-      viewModel.session.cleanupSetsGameInstance()
+      // Don't cleanup if game is not complete - we want to preserve the instance
+      if viewModel.isGameComplete {
+        viewModel.session.cleanupSetsGameInstance()
+      }
     }
+    .alert("Set Already Found", isPresented: $showAlreadyFoundAlert) {
+      Button("OK", role: .cancel) { }
+    } message: {
+      Text("You've already found this set. Try finding a different combination!")
+    }
+    .onChange(of: checkResult) { oldValue, newValue in
+      if newValue == .invalidSet {
+        UINotificationFeedbackGenerator().notificationOccurred(.error)
+      } else if newValue == .validSet {
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
+      } else if newValue == .alreadyFound {
+        UINotificationFeedbackGenerator().notificationOccurred(.warning)
+      }
+    }
+  }
+
+  // MARK: - State Management
+
+  private func saveGameState() {
+    viewModel.session.saveSetsGameState(modelContext: modelContext)
   }
 
   // MARK: - Game Content
@@ -154,42 +119,31 @@ struct SetsGameView: View {
   }
 
   private var gameStatsView: some View {
-    HStack(spacing: 30) {
-      VStack(spacing: 4) {
-        Text("\(viewModel.game.setsFound)")
-          .font(.title2)
-          .fontWeight(.bold)
-          .monospacedDigit()
-          .foregroundStyle(.green)
-
-        Text("Sets Found")
-          .font(.caption)
-          .foregroundStyle(.secondary)
+    VStack(spacing: 16) {
+      // Lives as hearts
+      HStack(spacing: 8) {
+        ForEach(0..<3, id: \.self) { index in
+          Image(systemName: index < (viewModel.game?.lifes ?? 3) ? "heart.fill" : "heart")
+            .font(.title2)
+            .foregroundStyle(index < (viewModel.game?.lifes ?? 3) ? .red : .gray.opacity(0.3))
+        }
       }
 
-      VStack(spacing: 4) {
-        Text("\(viewModel.game.lifes)")
-          .font(.title2)
-          .fontWeight(.bold)
-          .monospacedDigit()
-          .foregroundStyle(.primary)
+      // Found sets display
+      ScrollView(.horizontal, showsIndicators: false) {
+        HStack(spacing: 12) {
+          // Show found sets
+          ForEach(Array((viewModel.game?.foundSets ?? []).enumerated()), id: \.offset) { index, set in
+            MiniSetCardView(cards: set)
+          }
 
-        Text("Lifes")
-          .font(.caption)
-          .foregroundStyle(.secondary)
+          // Show empty slots for remaining sets
+          ForEach((viewModel.game?.foundSets.count ?? 0)..<(viewModel.game?.targetSets ?? 0), id: \.self) { index in
+            EmptySetSlotView()
+          }
+        }
       }
-
-      VStack(spacing: 4) {
-        Text("6")
-          .font(.title2)
-          .fontWeight(.bold)
-          .monospacedDigit()
-          .foregroundStyle(.orange)
-
-        Text("Target Sets")
-          .font(.caption)
-          .foregroundStyle(.secondary)
-      }
+      .frame(height: 60)
     }
     .padding()
     .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
@@ -202,11 +156,11 @@ struct SetsGameView: View {
       columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3),
       spacing: 8
     ) {
-      ForEach(viewModel.game.visibleCards, id: \.id) { card in
+      ForEach(viewModel.game?.visibleCards ?? [], id: \.id) { card in
         SetCardView(
           card: card,
-          isSelected: viewModel.game.selectedCards.contains(card),
-          isHinted: viewModel.game.hintCards.contains(card),
+          isSelected: viewModel.game?.selectedCards.contains(card) ?? false,
+          isHinted: viewModel.game?.hintCards.contains(card) ?? false,
           cardSize: cardSize
         ) {
           viewModel.selectCard(card)
@@ -222,54 +176,75 @@ struct SetsGameView: View {
       // Debug button
       DebugCompleteButton(session: viewModel.session, label: "Force Win")
         .disabled(viewModel.session.isCompleted)
-      
+
       HStack(spacing: 20) {
         Button {
           viewModel.shuffleCards()
         } label: {
-        HStack(spacing: 6) {
-          Image(systemName: "shuffle")
-          Text("Shuffle")
-            .font(.subheadline)
+          HStack(spacing: 6) {
+            Image(systemName: "shuffle")
+            Text("Shuffle")
+              .font(.subheadline)
+          }
+          .foregroundStyle(.secondary)
+          .frame(width: 100, height: 44)
+          .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
         }
-        .foregroundStyle(.secondary)
-        .frame(width: 100, height: 44)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
-      }
-      .sensoryFeedback(.impact(weight: .light), trigger: viewModel.game.visibleCards.count)
+        .sensoryFeedback(.impact(weight: .light), trigger: viewModel.game?.visibleCards.count ?? 0)
 
+      // Submit button - centered and prominent
       Button {
-        viewModel.game.checkForSet()
-      } label: {
-        ZStack {
-          Circle()
-            .foregroundStyle(.green)
-            .scaleEffect(0.99)
-
-          Image(systemName: "checkmark.circle.fill")
-            .resizable()
-            .scaledToFit()
-            .foregroundStyle(.thinMaterial)
+        if viewModel.game?.selectedCards.count == 3 {
+          checkResult = viewModel.checkSet()
+          if checkResult == .alreadyFound {
+            showAlreadyFoundAlert = true
+          }
         }
-        .frame(width: 100)
-      }
-
-      Button {
-        viewModel.findHint()
       } label: {
-        HStack(spacing: 6) {
-          Image(systemName: "lightbulb")
-          Text("Hint (\(3 - viewModel.game.hintsUsed))")
-            .font(.subheadline)
-        }
-        .foregroundStyle(viewModel.canUseHint ? .yellow : .secondary)
-        .frame(width: 100, height: 44)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+        Text("Submit")
+          .font(.headline)
+          .foregroundStyle(submitButtonTextColor)
+          .frame(width: 120, height: 50)
+          .background(submitButtonBackgroundColor)
+          .clipShape(RoundedRectangle(cornerRadius: 25))
+          .overlay(
+            RoundedRectangle(cornerRadius: 25)
+              .stroke(submitButtonBorderColor, lineWidth: 2)
+          )
       }
-      .sensoryFeedback(.impact(weight: .light), trigger: viewModel.game.hintCards.count)
-      .disabled(!viewModel.canUseHint)
+      .disabled(viewModel.game?.selectedCards.count != 3)
+      .scaleEffect(viewModel.game?.selectedCards.count == 3 ? 1.0 : 0.95)
+      .animation(.spring(response: 0.3, dampingFraction: 0.6), value: viewModel.game?.selectedCards.count)
+
+        Button {
+          viewModel.findHint()
+        } label: {
+          HStack(spacing: 6) {
+            Image(systemName: "lightbulb")
+            Text("Hint (\(3 - (viewModel.game?.hintsUsed ?? 0)))")
+              .font(.subheadline)
+          }
+          .foregroundStyle(viewModel.canUseHint ? .yellow : .secondary)
+          .frame(width: 100, height: 44)
+          .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+        }
+        .sensoryFeedback(.impact(weight: .light), trigger: viewModel.game?.hintCards.count ?? 0)
+        .disabled(!viewModel.canUseHint)
       }
     }
+  }
+
+  // MARK: - Button State Properties
+  private var submitButtonBackgroundColor: Color {
+    viewModel.game?.selectedCards.count == 3 ? .green : .gray.opacity(0.2)
+  }
+
+  private var submitButtonTextColor: Color {
+    viewModel.game?.selectedCards.count == 3 ? .white : .gray
+  }
+
+  private var submitButtonBorderColor: Color {
+    viewModel.game?.selectedCards.count == 3 ? .green : .gray.opacity(0.3)
   }
 
   // MARK: - Helper Methods
@@ -285,6 +260,13 @@ struct SetsGameView: View {
   private func handleGameCompletion() {
     gameTimer.stopTimer()
     viewModel.session.complete()
+
+    // Clear state when game is completed
+    let stateManager = viewModel.session.getSetsStateManager(modelContext: modelContext)
+    stateManager.clearState(for: viewModel.session)
+
+    // Clean up the game instance
+    viewModel.session.cleanupSetsGameInstance()
   }
 
   private var backgroundGradient: some View {
@@ -297,7 +279,7 @@ struct SetsGameView: View {
   }
 }
 
-// COMPONENTS
+// COMPONENTS (rest of the components remain the same)
 // Set Card View
 
 struct SetCardView: View {
@@ -525,234 +507,108 @@ struct RoundedSquare: Shape {
   }
 }
 
-// GAME VIEW MODEL
+// Miniature set card view
+struct MiniSetCardView: View {
+  let cards: [SetCard]
 
-@Observable
-class SetsGame {
-  // Game state
-  var deck: [SetCard] = []
-  var visibleCards: [SetCard] = []
-  var selectedCards: [SetCard] = []
-  var foundSets: [[SetCard]] = []
-  var hintCards: [SetCard] = []
-
-  // Game stats
-  var lifes = 999
-  var setsFound = 0
-  var hintsUsed = 0
-  var targetSets = 6
-  var isGameComplete = false
-  var isGameOver = false
-
-  init() {
-    setupNewGame()
-  }
-
-  func loadLevel(_ levelData: SetsLevelData) {
-    targetSets = 6
-    setupNewGame()
-  }
-
-  func setupNewGame() {
-    generateDeck()
-    deck.shuffle()
-    dealInitialCards()
-    selectedCards = []
-    foundSets = []
-    hintCards = []
-    lifes = 5
-    setsFound = 0
-    hintsUsed = 0
-    isGameComplete = false
-    isGameOver = false
-  }
-
-  private func generateDeck() {
-    deck = []
-
-    for color in SetColor.allCases {
-      for shape in SetShape.allCases {
-        for shading in SetShading.allCases {
-          for count in SetCount.allCases {
-            deck.append(SetCard(
-              color: color,
-              shape: shape,
-              shading: shading,
-              count: count
-            ))
+  var body: some View {
+    VStack(spacing: 2) {
+      ForEach(Array(cards.enumerated()), id: \.offset) { index, card in
+        HStack(spacing: 2) {
+          ForEach(0..<card.count.rawValue, id: \.self) { _ in
+            MiniShapeView(card: card)
+              .frame(width: 12, height: 12)
           }
+        }
+      }
+    }
+    .padding(8)
+    .background(Color.green.opacity(0.2))
+    .overlay(
+      RoundedRectangle(cornerRadius: 8)
+        .stroke(Color.green, lineWidth: 2)
+    )
+    .clipShape(RoundedRectangle(cornerRadius: 8))
+  }
+}
+
+// Empty set slot view
+struct EmptySetSlotView: View {
+  var body: some View {
+    RoundedRectangle(cornerRadius: 8)
+      .fill(Color.gray.opacity(0.1))
+      .overlay(
+        RoundedRectangle(cornerRadius: 8)
+          .stroke(Color.gray.opacity(0.3), lineWidth: 1)
+      )
+      .frame(width: 50, height: 50)
+  }
+}
+
+// Mini shape view for the found sets display
+struct MiniShapeView: View {
+  let card: SetCard
+
+  var body: some View {
+    Group {
+      switch card.shading {
+      case .solid:
+        AnyShape(shape)
+          .fill(color)
+      case .striped:
+        ZStack {
+          AnyShape(shape)
+            .fill(.clear)
+          AnyShape(shape)
+            .fill(miniStripedPattern)
+            .stroke(color, lineWidth: 0.5)
+        }
+      case .outline:
+        ZStack {
+          AnyShape(shape)
+            .fill(.clear)
+          AnyShape(shape)
+            .stroke(color, lineWidth: 1)
         }
       }
     }
   }
 
-  private func dealInitialCards() {
-    visibleCards = []
-
-    // Deal 12 cards initially
-    for _ in 0..<12 {
-      if !deck.isEmpty {
-        visibleCards.append(deck.removeFirst())
-      }
+  private var shape: any Shape {
+    switch card.shape {
+    case .hourglass: return Hourglass()
+    case .star: return Star()
+    case .roundedSquare: return RoundedSquare()
     }
   }
 
-  func selectCard(_ card: SetCard) {
-    if selectedCards.contains(card) {
-      deselectCard(card)
-      return
-    }
-
-    if selectedCards.count < 3 {
-      selectedCards.append(card)
-
-      if selectedCards.count >= 3 {
-        return
-      }
-    }
-
-    // Clear hint when user selects cards
-    hintCards = []
-  }
-
-  func deselectCard(_ card: SetCard) {
-    selectedCards.removeAll { $0.id == card.id }
-    hintCards = []
-  }
-
-  func checkForSet() {
-    guard selectedCards.count == 3 else { return }
-
-    if isValidSet(selectedCards) {
-      // Valid set found!
-      foundSets.append(selectedCards)
-      setsFound += 1
-
-      // Remove cards from visible deck
-      for card in selectedCards {
-        visibleCards.removeAll { $0.id == card.id }
-      }
-
-//      dealReplacementCards()
-
-      // Check win condition
-      checkWinCondition()
-
-      // Haptic feedback for success
-      let impact = UINotificationFeedbackGenerator()
-      impact.notificationOccurred(.success)
-    } else {
-      // Invalid set - deduct points
-      lifes -= 1
-      if lifes <= 0 {
-        isGameOver = true
-        isGameComplete = true
-      }
-      let impact = UINotificationFeedbackGenerator()
-      impact.notificationOccurred(.error)
-    }
-
-    // Clear selection after a brief delay
-    DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
-      self.selectedCards = []
+  private var color: Color {
+    switch card.color {
+    case .red: return .red
+    case .green: return .green
+    case .purple: return .purple
     }
   }
 
-  func isValidSet(_ cards: [SetCard]) -> Bool {
-    guard cards.count == 3 else { return false }
-
-    let colors = Set(cards.map { $0.color })
-    let shapes = Set(cards.map { $0.shape })
-    let shadings = Set(cards.map { $0.shading })
-    let counts = Set(cards.map { $0.count })
-
-    // For each attribute, all three cards must be either all the same or all different
-    let colorsValid = colors.count == 1 || colors.count == 3
-    let shapesValid = shapes.count == 1 || shapes.count == 3
-    let shadingsValid = shadings.count == 1 || shadings.count == 3
-    let countsValid = counts.count == 1 || counts.count == 3
-
-    return colorsValid && shapesValid && shadingsValid && countsValid
-  }
-
-  private func calculateSetScore() -> Int {
-    let baseScore = 10
-    let hintPenalty = hintsUsed * 2
-    return max(1, baseScore - hintPenalty)
-  }
-
-  private func dealReplacementCards() {
-    while visibleCards.count < 12 && !deck.isEmpty {
-      visibleCards.append(deck.removeFirst())
-    }
-  }
-
-  private func checkWinCondition() {
-    if setsFound >= targetSets {
-      isGameComplete = true
-      let impact = UIImpactFeedbackGenerator(style: .heavy)
-      impact.impactOccurred()
-    }
-  }
-
-  func shuffleCards() {
-    visibleCards.shuffle()
-    selectedCards = []
-    hintCards = []
-  }
-
-  func findHint() {
-    guard hintsUsed < 3 else { return }
-
-    hintCards = []
-
-    // Find any valid set in visible cards
-    for i in 0..<visibleCards.count {
-      for j in (i+1)..<visibleCards.count {
-        for k in (j+1)..<visibleCards.count {
-          let cards = [visibleCards[i], visibleCards[j], visibleCards[k]]
-          if isValidSet(cards) {
-            hintCards = cards
-            hintsUsed += 1
-            return
-          }
-        }
-      }
-    }
-
-    // No sets found
-    let impact = UINotificationFeedbackGenerator()
-    impact.notificationOccurred(.warning)
+  private var miniStripedPattern: some ShapeStyle {
+    LinearGradient(
+      stops: [
+        .init(color: color, location: 0.0),
+        .init(color: color, location: 0.25),
+        .init(color: .clear, location: 0.25),
+        .init(color: .clear, location: 0.5),
+        .init(color: color, location: 0.5),
+        .init(color: color, location: 0.75),
+        .init(color: .clear, location: 0.75),
+        .init(color: .clear, location: 1.0)
+      ],
+      startPoint: .topLeading,
+      endPoint: .bottomTrailing
+    )
   }
 }
 
-// MODELS
 
-struct SetCard: Identifiable, Equatable {
-  let id = UUID()
-  let color: SetColor
-  let shape: SetShape
-  let shading: SetShading
-  let count: SetCount
-}
-
-enum SetColor: CaseIterable {
-  case red, green, purple
-}
-
-enum SetShape: CaseIterable {
-  case hourglass, star, roundedSquare
-}
-
-enum SetShading: CaseIterable {
-  case solid, striped, outline
-}
-
-enum SetCount: Int, CaseIterable {
-  case one = 1, two = 2, three = 3
-}
-
-// Preview
 #Preview("Sets Game - Daily Challenge") {
   let mockLevel = try! AnyGameLevel(SetsLevelData(id: "sets_daily_1"))
 

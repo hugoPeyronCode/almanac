@@ -8,7 +8,6 @@
 import SwiftUI
 import SwiftData
 
-// MARK: - Temporary Debug Button
 struct DebugCompleteButton: View {
     let session: GameSession
     let label: String
@@ -312,6 +311,92 @@ extension GameSession.GameContext {
     }
 }
 
+// MARK: - Sets GameSession Extension with State Management
+extension GameSession {
+    private static var setsGameInstances: [String: SetsGame] = [:]
+    private static var stateManagers: [String: SetsGameStateManager] = [:]
+
+    func initializeSetsGame(with modelContext: ModelContext) -> SetsGame {
+        let sessionKey = getSessionKey()
+
+        // Return existing instance if available
+        if let existingGame = Self.setsGameInstances[sessionKey] {
+            return existingGame
+        }
+
+        // Create state manager
+        let stateManager = getSetsStateManager(modelContext: modelContext)
+
+        // Create new game instance
+        let setsGame: SetsGame
+
+        if case .daily(let date) = context {
+            // For daily challenges, use deterministic seed
+            let seed = stateManager.getDailySeed(for: date)
+            setsGame = SetsGame(seed: seed)
+        } else {
+            // For practice/random, use regular random generation
+            setsGame = SetsGame()
+        }
+
+        // Try to load saved state
+        if stateManager.loadState(for: self, into: setsGame) {
+            print("✅ Restored Sets game state from storage")
+        } else {
+            print("ℹ️ No saved state found, starting fresh game")
+        }
+
+        Self.setsGameInstances[sessionKey] = setsGame
+        return setsGame
+    }
+
+    var setsGame: SetsGame {
+        // This should only be called after initializeSetsGame
+        let sessionKey = getSessionKey()
+        return Self.setsGameInstances[sessionKey] ?? SetsGame()
+    }
+
+    func saveSetsGameState(modelContext: ModelContext) {
+        let sessionKey = getSessionKey()
+        guard let game = Self.setsGameInstances[sessionKey] else { return }
+
+        let stateManager = getSetsStateManager(modelContext: modelContext)
+        stateManager.saveState(for: self, game: game)
+    }
+
+    func getSetsStateManager(modelContext: ModelContext) -> SetsGameStateManager {
+        let sessionKey = getSessionKey()
+
+        if let existingManager = Self.stateManagers[sessionKey] {
+            return existingManager
+        }
+
+        let manager = SetsGameStateManager(modelContext: modelContext)
+        Self.stateManagers[sessionKey] = manager
+        return manager
+    }
+
+    func cleanupSetsGameInstance() {
+        let sessionKey = getSessionKey()
+        Self.setsGameInstances.removeValue(forKey: sessionKey)
+        Self.stateManagers.removeValue(forKey: sessionKey)
+    }
+
+    private func getSessionKey() -> String {
+        switch context {
+        case .daily(let date):
+            // For daily challenges, use date as key for consistency
+            let formatter = DateFormatter()
+            formatter.dateFormat = "yyyy-MM-dd"
+            return "sets_daily_\(formatter.string(from: date))"
+        case .practice, .random:
+            // For other modes, use session ID
+            return "sets_\(id.uuidString)"
+        }
+    }
+}
+
+
 // MARK: - Progress Manager
 
 @Observable
@@ -457,73 +542,93 @@ class ProgressManager {
     }
 }
 
-// MARK: Sets GameSession Extension
 extension GameSession {
-  private static var setsGameInstances: [String: SetsGame] = [:]
+    private static var shikakuGameInstances: [String: ShikakuGame] = [:]
+    private static var shikakuStateManagers: [String: ShikakuStateManager] = [:]
 
-  var setsGame: SetsGame {
-    let sessionKey = "\(id.uuidString)"
+    func initializeShikakuGame(with modelContext: ModelContext) -> ShikakuGame {
+        let sessionKey = getShikakuSessionKey()
 
-    if let existingGame = Self.setsGameInstances[sessionKey] {
-      return existingGame
-    }
-
-    let setsGame = SetsGame()
-
-    if gameType == .sets {
-      let levelData = SetsLevelData(id: level.id)
-      setsGame.loadLevel(levelData)
-    }
-
-    Self.setsGameInstances[sessionKey] = setsGame
-    return setsGame
-  }
-
-  func cleanupSetsGameInstance() {
-    let sessionKey = "\(id.uuidString)"
-    Self.setsGameInstances.removeValue(forKey: sessionKey)
-  }
-}
-
-extension GameSession {
-    private static var gameInstances: [String: ShikakuGame] = [:]
-
-    var shikakuGame: ShikakuGame {
-        // Use session ID as key to maintain unique game instances
-        let sessionKey = "\(id.uuidString)"
-
-        // Return existing game instance if it exists
-        if let existingGame = Self.gameInstances[sessionKey] {
+        // Return existing instance if available
+        if let existingGame = Self.shikakuGameInstances[sessionKey] {
             return existingGame
         }
 
-        // Create new game instance for this session
+        // Create state manager
+        let stateManager = getShikakuStateManager(modelContext: modelContext)
+
+        // Create game instance
         let shikakuGame = ShikakuGame()
 
-        // Load the actual level data if it's a Shikaku level
+        // Load level data
         if gameType == .shikaku {
             do {
                 let levelData = try level.decode(as: ShikakuLevelData.self)
+
+                // For daily challenges, save the level configuration
+                if case .daily = context {
+                    stateManager.saveLevelConfiguration(for: self, levelData: levelData)
+                }
+
                 shikakuGame.loadLevel(levelData)
             } catch {
-                // Fallback: create a default level
                 shikakuGame.loadDefaultLevel()
             }
         } else {
-            // For non-Shikaku games, load default
             shikakuGame.loadDefaultLevel()
         }
 
-        // Store the game instance
-        Self.gameInstances[sessionKey] = shikakuGame
+        // Try to load saved state
+        if stateManager.loadState(for: self, into: shikakuGame) {
+            print("✅ Restored Shikaku game state from storage")
+        } else {
+            print("ℹ️ No saved state found, starting fresh game")
+        }
 
+        Self.shikakuGameInstances[sessionKey] = shikakuGame
         return shikakuGame
     }
 
-    // Clean up game instance when session ends
+    var shikakuGame: ShikakuGame {
+        let sessionKey = getShikakuSessionKey()
+        return Self.shikakuGameInstances[sessionKey] ?? ShikakuGame()
+    }
+
+    func saveShikakuGameState(modelContext: ModelContext) {
+        let sessionKey = getShikakuSessionKey()
+        guard let game = Self.shikakuGameInstances[sessionKey] else { return }
+
+        let stateManager = getShikakuStateManager(modelContext: modelContext)
+        stateManager.saveState(for: self, game: game)
+    }
+
+    func getShikakuStateManager(modelContext: ModelContext) -> ShikakuStateManager {
+        let sessionKey = getShikakuSessionKey()
+
+        if let existingManager = Self.shikakuStateManagers[sessionKey] {
+            return existingManager
+        }
+
+        let manager = ShikakuStateManager(modelContext: modelContext)
+        Self.shikakuStateManagers[sessionKey] = manager
+        return manager
+    }
+
     func cleanupGameInstance() {
-        let sessionKey = "\(id.uuidString)"
-        Self.gameInstances.removeValue(forKey: sessionKey)
+        let sessionKey = getShikakuSessionKey()
+        Self.shikakuGameInstances.removeValue(forKey: sessionKey)
+        Self.shikakuStateManagers.removeValue(forKey: sessionKey)
+    }
+
+    private func getShikakuSessionKey() -> String {
+        switch context {
+        case .daily(let date):
+            let formatter = DateFormatter()
+            formatter.dateFormat = "yyyy-MM-dd"
+            return "shikaku_daily_\(formatter.string(from: date))"
+        case .practice, .random:
+            return "shikaku_\(id.uuidString)"
+        }
     }
 }
 

@@ -2,27 +2,28 @@
 //  ShikakuGameView.swift
 //  shikaku
 //
-//  Updated game view with single tile selection and responsive grid
+//  Updated with state persistence
 //
 
 import SwiftUI
+import SwiftData
 
 struct ShikakuGameView: View {
   @Environment(\.modelContext) private var modelContext
   @Environment(GameCoordinator.self) private var coordinator
 
-  @State private var session: GameSession
+  let session: GameSession
   @State private var showExitConfirmation = false
   @State private var gameTimer = GameTimer()
+  @State private var game: ShikakuGame?
 
   @State private var dragStart: GridPosition?
   @State private var dragEnd: GridPosition?
   @State private var isDragging = false
   @State private var dragDistance: CGFloat = 0
 
-
   init(session: GameSession) {
-    self._session = State(initialValue: session)
+    self.session = session
   }
 
   var body: some View {
@@ -36,71 +37,89 @@ struct ShikakuGameView: View {
             showExitConfirmation: $showExitConfirmation,
             gameTimer: gameTimer
           ) {
+            // Save state before dismissing
+            if game != nil {
+              session.saveShikakuGameState(modelContext: modelContext)
+            }
             gameTimer.stopTimer()
             coordinator.dismissFullScreen()
           }
 
           Spacer()
 
-          gameGrid(in: geometry)
+          if let game = game {
+            gameGrid(game: game, in: geometry)
 
-          Spacer()
+            Spacer()
 
-          controlsView
+            controlsView(game: game)
+          } else {
+            Spacer()
+            ProgressView("Loading...")
+            Spacer()
+          }
         }
         .padding()
 
-        if session.shikakuGame.isGameComplete {
+        if game?.isGameComplete == true {
           GameCompletionView(formattedDuration: formattedDuration, coordinator: coordinator, session: session)
             .ignoresSafeArea()
         }
       }
     }
     .navigationBarHidden(true)
-    .onChange(of: session.shikakuGame.isGameComplete) { _, isComplete in
+    .onChange(of: game?.isGameComplete ?? false) { _, isComplete in
       if isComplete && !session.isCompleted {
         handleGameCompletion()
       }
     }
     .confirmationDialog("Exit Game", isPresented: $showExitConfirmation) {
       Button("Exit", role: .destructive) {
+        if game != nil {
+          session.saveShikakuGameState(modelContext: modelContext)
+        }
         coordinator.dismissFullScreen()
       }
       Button("Cancel", role: .cancel) { }
     } message: {
-      Text("Are you sure you want to exit? Progress will be lost.")
+      Text("Are you sure you want to exit? Progress will be saved.")
     }
     .onAppear {
-//      session.game.generateReferenceLevel()
+      // Initialize the game with model context
+      game = session.initializeShikakuGame(with: modelContext)
+
       gameTimer.displayTime = session.actualPlayTime
       gameTimer.startTimer()
     }
     .onDisappear {
       gameTimer.stopTimer()
 
-      if !session.shikakuGame.isGameComplete {
+      if !(game?.isGameComplete ?? true) {
         session.pause()
         gameTimer.pause()
+        if game != nil {
+          session.saveShikakuGameState(modelContext: modelContext)
+        }
       }
 
-      // Clean up the game instance to prevent memory leaks
-      session.cleanupGameInstance()
+      // Don't cleanup if game is not complete - preserve instance
+      if game?.isGameComplete ?? false {
+        session.cleanupGameInstance()
+      }
     }
-
-
   }
 
   // MARK: - Views
-  private func gameGrid(in geometry: GeometryProxy) -> some View {
-    let cellSize = calculateCellSize(in: geometry)
+  private func gameGrid(game: ShikakuGame, in geometry: GeometryProxy) -> some View {
+    let cellSize = calculateCellSize(game: game, in: geometry)
 
     return VStack(spacing: 2) {
-      ForEach(0..<session.shikakuGame.gridSize.rows, id: \.self) { row in
+      ForEach(0..<game.gridSize.rows, id: \.self) { row in
         HStack(spacing: 2) {
-          ForEach(0..<session.shikakuGame.gridSize.cols, id: \.self) { col in
+          ForEach(0..<game.gridSize.cols, id: \.self) { col in
             ShikakuCellView(
               position: GridPosition(row: row, col: col),
-              game: session.shikakuGame,
+              game: game,
               cellSize: cellSize,
               dragStart: dragStart,
               dragEnd: dragEnd,
@@ -111,20 +130,20 @@ struct ShikakuGameView: View {
       }
     }
     .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
-    .gesture(createDragGesture(cellSize: cellSize))
+    .gesture(createDragGesture(game: game, cellSize: cellSize))
   }
 
-  private var controlsView: some View {
+  private func controlsView(game: ShikakuGame) -> some View {
     HStack {
       // Debug button
       DebugCompleteButton(session: session, label: "Force Win")
         .disabled(session.isCompleted)
-      
+
       Spacer()
-      
+
       Button {
         withAnimation(.spring(duration: 0.3)) {
-          session.shikakuGame.clearBoard()
+          game.clearBoard()
         }
       } label: {
         Text("Clear")
@@ -132,34 +151,13 @@ struct ShikakuGameView: View {
           .frame(width: 80, height: 44)
           .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
       }
-      .sensoryFeedback(.impact(weight: .medium), trigger: session.shikakuGame.rectangles.isEmpty)
+      .sensoryFeedback(.impact(weight: .medium), trigger: game.rectangles.isEmpty)
 
       Spacer()
     }
   }
 
-
-  // MARK: - TIMER MANAGEMENT
-  private func togglePause() {
-    withAnimation(.easeInOut(duration: 0.3)) {
-      if gameTimer.isPaused {
-        session.resume()
-        gameTimer.resume()
-      } else {
-        session.pause()
-        gameTimer.pause()
-      }
-    }
-  }
-
-  private func handleGameCompletion() {
-    gameTimer.stopTimer()
-    session.complete()
-  }
-
-
   // MARK: - Helper Methods
-
   private var contextTitle: String {
     switch session.context {
     case .daily: return "Daily Puzzle"
@@ -169,69 +167,70 @@ struct ShikakuGameView: View {
   }
 
   private var contextSubtitle: String {
-    "\(session.shikakuGame.gridSize.rows)×\(session.shikakuGame.gridSize.cols) • \(session.shikakuGame.numberClues.count) clues"
+    guard let game = game else { return "" }
+    return "\(game.gridSize.rows)×\(game.gridSize.cols) • \(game.numberClues.count) clues"
   }
 
   private var formattedDuration: String {
     return session.formattedPlayTime
   }
 
-  private func calculateCellSize(in geometry: GeometryProxy) -> CGFloat {
+  private func calculateCellSize(game: ShikakuGame, in geometry: GeometryProxy) -> CGFloat {
     let availableWidth = max(geometry.size.width - 30, 0)
     let availableHeight = max(geometry.size.height * 0.7, 0)
 
-    let cellWidth = availableWidth / CGFloat(max(session.shikakuGame.gridSize.cols + 1, 1))
-    let cellHeight = availableHeight / CGFloat(max(session.shikakuGame.gridSize.rows + 1, 1))
+    let cellWidth = availableWidth / CGFloat(max(game.gridSize.cols + 1, 1))
+    let cellHeight = availableHeight / CGFloat(max(game.gridSize.rows + 1, 1))
 
     let calculatedSize = min(cellWidth, cellHeight, 70)
 
-    // S'assurer que la taille est toujours positive et finie
+    // Ensure size is positive and finite
     return max(calculatedSize, 20).isFinite ? max(calculatedSize, 20) : 20
   }
 
   // MARK: - Gesture Handling
 
-  private func createDragGesture(cellSize: CGFloat) -> some Gesture {
+  private func createDragGesture(game: ShikakuGame, cellSize: CGFloat) -> some Gesture {
     DragGesture(minimumDistance: 0)
       .onChanged { value in
-        handleDragChanged(value, cellSize: cellSize)
+        handleDragChanged(value, game: game, cellSize: cellSize)
       }
       .onEnded { value in
-        handleDragEnded(value, cellSize: cellSize)
+        handleDragEnded(value, game: game, cellSize: cellSize)
       }
   }
 
-  private func handleDragChanged(_ value: DragGesture.Value, cellSize: CGFloat) {
-    // Calculer la distance de drag pour différencier tap vs drag
+  private func handleDragChanged(_ value: DragGesture.Value, game: ShikakuGame, cellSize: CGFloat) {
+    // Calculate drag distance to differentiate tap vs drag
     dragDistance = sqrt(pow(value.translation.width, 2) + pow(value.translation.height, 2))
 
     if !isDragging {
-      dragStart = positionFromLocation(value.startLocation, cellSize: cellSize)
+      dragStart = positionFromLocation(value.startLocation, game: game, cellSize: cellSize)
       isDragging = true
     }
 
-    dragEnd = positionFromLocation(value.location, cellSize: cellSize)
+    dragEnd = positionFromLocation(value.location, game: game, cellSize: cellSize)
   }
 
-  private func handleDragEnded(_ value: DragGesture.Value, cellSize: CGFloat) {
+  private func handleDragEnded(_ value: DragGesture.Value, game: ShikakuGame, cellSize: CGFloat) {
     guard let start = dragStart else {
       resetDragState()
       return
     }
 
-    // Seuil pour considérer que c'est un tap (en points)
+    // Threshold to consider it a tap (in points)
     let tapThreshold: CGFloat = 10
 
     if dragDistance < tapThreshold {
-      // C'est un tap - vérifier s'il y a un rectangle à supprimer
-      handleTapAtPosition(start)
+      // It's a tap - check if there's a rectangle to remove
+      handleTapAtPosition(start, game: game)
     } else if let end = dragEnd {
-      // C'est un drag - créer un rectangle
-      let validation = session.shikakuGame.validatePreviewRectangle(from: start, to: end)
+      // It's a drag - create a rectangle
+      let validation = game.validatePreviewRectangle(from: start, to: end)
 
       if validation.isValid {
         withAnimation(.spring(duration: 0.3)) {
-          session.shikakuGame.addOrUpdateRectangle(from: start, to: end)
+          game.addOrUpdateRectangle(from: start, to: end)
         }
       }
     }
@@ -239,23 +238,23 @@ struct ShikakuGameView: View {
     resetDragState()
   }
 
-  private func handleTapAtPosition(_ position: GridPosition) {
-    // Vérifier s'il y a un rectangle à cette position
-    if session.shikakuGame.hasRectangleAt(position: position) {
+  private func handleTapAtPosition(_ position: GridPosition, game: ShikakuGame) {
+    // Check if there's a rectangle at this position
+    if game.hasRectangleAt(position: position) {
       withAnimation(.spring(duration: 0.3)) {
-        session.shikakuGame.removeRectangle(at: position)
+        game.removeRectangle(at: position)
       }
-      // Haptic feedback pour la suppression
-      session.shikakuGame.triggerSelectionHaptic()
+      // Haptic feedback for deletion
+      game.triggerSelectionHaptic()
     }
   }
 
-  private func positionFromLocation(_ location: CGPoint, cellSize: CGFloat) -> GridPosition? {
+  private func positionFromLocation(_ location: CGPoint, game: ShikakuGame, cellSize: CGFloat) -> GridPosition? {
     let col = Int(location.x / (cellSize + 2))
     let row = Int(location.y / (cellSize + 2))
 
-    guard row >= 0 && row < session.shikakuGame.gridSize.rows &&
-            col >= 0 && col < session.shikakuGame.gridSize.cols else {
+    guard row >= 0 && row < game.gridSize.rows &&
+            col >= 0 && col < game.gridSize.cols else {
       return nil
     }
 
@@ -267,6 +266,18 @@ struct ShikakuGameView: View {
     dragEnd = nil
     isDragging = false
     dragDistance = 0
+  }
+
+  private func handleGameCompletion() {
+    gameTimer.stopTimer()
+    session.complete()
+
+    // Clear state when game is completed
+    let stateManager = session.getShikakuStateManager(modelContext: modelContext)
+    stateManager.clearState(for: session)
+
+    // Clean up the game instance
+    session.cleanupGameInstance()
   }
 
   private var backgroundGradient: some View {
@@ -438,7 +449,14 @@ class ShikakuGame {
       print("⚠️ Loaded default Shikaku level")
   }
 
-  // NOUVELLE FONCTION: Vérifier s'il y a un rectangle à une position donnée
+  func getColorPalette() -> [Color] {
+      return colorPalette
+  }
+
+  func setColorIndex(_ index: Int) {
+      colorIndex = index
+  }
+
   func hasRectangleAt(position: GridPosition) -> Bool {
     return rectangles.contains { rectangle in
       rectangle.contains(position: position)

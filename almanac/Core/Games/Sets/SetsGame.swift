@@ -25,17 +25,7 @@ class SetsGame {
   var isGameComplete = false
   var isGameOver = false
 
-  // For deterministic generation
-  private var randomGenerator: SeededRandomGenerator?
-
   init() {
-    // Default initialization without seed
-    setupNewGame()
-  }
-
-  init(seed: Int) {
-    // Initialize with seed for deterministic generation
-    self.randomGenerator = SeededRandomGenerator(seed: seed)
     setupNewGame()
   }
 
@@ -49,11 +39,6 @@ class SetsGame {
     hintsUsed = 0
     isGameComplete = false
     isGameOver = false
-  }
-
-  func setupWithSeed(_ seed: Int) {
-    self.randomGenerator = SeededRandomGenerator(seed: seed)
-    setupNewGame()
   }
 
   private func generateValidDeck() {
@@ -94,17 +79,7 @@ class SetsGame {
   }
 
   private func shuffleDeck() {
-    if var generator = randomGenerator {
-      // Deterministic shuffle using seeded random
-      for i in stride(from: deck.count - 1, through: 1, by: -1) {
-        let j = generator.nextInt(in: 0..<(i + 1))
-        deck.swapAt(i, j)
-      }
-      randomGenerator = generator
-    } else {
-      // Regular random shuffle
       deck.shuffle()
-    }
   }
 
   private func dealInitialCards() {
@@ -230,22 +205,6 @@ class SetsGame {
       let impact = UIImpactFeedbackGenerator(style: .heavy)
       impact.impactOccurred()
     }
-  }
-
-  func shuffleCards() {
-    if var generator = randomGenerator {
-      // Deterministic shuffle
-      for i in stride(from: visibleCards.count - 1, through: 1, by: -1) {
-        let j = generator.nextInt(in: 0..<(i + 1))
-        visibleCards.swapAt(i, j)
-      }
-      randomGenerator = generator
-    } else {
-      // Regular shuffle
-      visibleCards.shuffle()
-    }
-    selectedCards = []
-    hintCards = []
   }
 
   func findHint() {

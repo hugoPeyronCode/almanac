@@ -359,7 +359,6 @@ struct SetsLevelData: GameLevelData {
 }
 
 // MARK: - Legacy WordleLevelData (Remove this later)
-
 struct WordleLevelData: GameLevelData {
     let id: String
     let targetWord: String

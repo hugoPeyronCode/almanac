@@ -31,8 +31,6 @@ struct SetsGameView: View {
             showExitConfirmation: $showExitConfirmation,
             gameTimer: gameTimer
           ) {
-            // Save state before dismissing
-            saveGameState()
             gameTimer.stopTimer()
             coordinator.dismissFullScreen()
           }
@@ -78,14 +76,8 @@ struct SetsGameView: View {
       if !viewModel.isGameComplete {
         viewModel.session.pause()
         gameTimer.pause()
-        // Save state before leaving
-        viewModel.session.saveSetsGameState(modelContext: modelContext)
       }
 
-      // Don't cleanup if game is not complete - we want to preserve the instance
-      if viewModel.isGameComplete {
-        viewModel.session.cleanupSetsGameInstance()
-      }
     }
     .alert("Set Already Found", isPresented: $showAlreadyFoundAlert) {
       Button("OK", role: .cancel) { }
@@ -103,11 +95,6 @@ struct SetsGameView: View {
     }
   }
 
-  // MARK: - State Management
-
-  private func saveGameState() {
-    viewModel.session.saveSetsGameState(modelContext: modelContext)
-  }
 
   // MARK: - Game Content
 
@@ -260,13 +247,6 @@ struct SetsGameView: View {
   private func handleGameCompletion() {
     gameTimer.stopTimer()
     viewModel.session.complete()
-
-    // Clear state when game is completed
-    let stateManager = viewModel.session.getSetsStateManager(modelContext: modelContext)
-    stateManager.clearState(for: viewModel.session)
-
-    // Clean up the game instance
-    viewModel.session.cleanupSetsGameInstance()
   }
 
   private var backgroundGradient: some View {

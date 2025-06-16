@@ -33,8 +33,6 @@ struct WordleGameView: View {
               showExitConfirmation: $showExitConfirmation,
               gameTimer: gameTimer
             ) {
-              // Save state before dismissing
-              saveGameState()
               gameTimer.stopTimer()
               coordinator.dismissFullScreen()
             }
@@ -78,14 +76,8 @@ struct WordleGameView: View {
         handleGameCompletion()
       }
     }
-    .onChange(of: game?.guesses ?? []) { _, _ in
-      // Auto-save when guesses change
-      saveGameState()
-    }
-    .onAppear {
-      // Initialize the game with model context
-      game = session.initializeWordleGame(with: modelContext)
 
+    .onAppear {
       gameTimer.displayTime = session.actualPlayTime
       gameTimer.startTimer()
     }
@@ -95,7 +87,6 @@ struct WordleGameView: View {
       if !(game?.isGameComplete ?? true) {
         session.pause()
         gameTimer.pause()
-        saveGameState()
       }
 
       // Don't cleanup if game is not complete - preserve instance
@@ -105,7 +96,6 @@ struct WordleGameView: View {
     }
     .confirmationDialog("Exit Game", isPresented: $showExitConfirmation) {
       Button("Exit", role: .destructive) {
-        saveGameState()
         coordinator.dismissFullScreen()
       }
       Button("Cancel", role: .cancel) { }
@@ -117,12 +107,6 @@ struct WordleGameView: View {
     } message: {
       Text("'\(game?.currentAttempt ?? "")' is not in the word list")
     }
-  }
-
-  // MARK: - State Management
-
-  private func saveGameState() {
-    session.saveWordleGameState(modelContext: $modelContext)
   }
 
   // MARK: - Game Content
@@ -308,13 +292,6 @@ struct WordleGameView: View {
   private func handleGameCompletion() {
     gameTimer.stopTimer()
     session.complete()
-
-    // Clear state when game is completed
-    let stateManager = session.getWordleStateManager(modelContext: modelContext)
-    stateManager.clearState(for: session)
-
-    // Clean up the game instance
-    session.cleanupWordleGameInstance()
   }
 
   private var backgroundGradient: some View {
@@ -392,41 +369,3 @@ enum LetterState {
   case wrongPosition
   case notInWord
 }
-
-// MARK: - Game Logic
-
-@Observable
-class WordleGame {
-  let targetWord: String
-  let maxAttempts: Int
-  var guesses: [String] = []
-  var currentAttempt: String = ""
-
-  var isGameOver: Bool { guesses.count >= maxAttempts && !isGameWon }
-  var isGameWon: Bool { guesses.contains(targetWord) }
-  var isGameComplete: Bool { isGameWon || isGameOver }
-
-  init(targetWord: String, maxAttempts: Int) {
-    self.targetWord = targetWord.uppercased()
-    self.maxAttempts = maxAttempts
-  }
-
-  func submitGuess(_ guess: String) {
-    guard !isGameComplete, guess.count == targetWord.count else { return }
-    guesses.append(guess.uppercased())
-    currentAttempt = ""
-  }
-
-  func addLetter(_ letter: Character) {
-    guard currentAttempt.count < targetWord.count, !isGameComplete else { return }
-    currentAttempt.append(letter.uppercased())
-  }
-
-  func deleteLastLetter() {
-    guard !currentAttempt.isEmpty, !isGameComplete else { return }
-    currentAttempt.removeLast()
-  }
-}
-
-
-

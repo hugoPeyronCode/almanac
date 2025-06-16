@@ -20,28 +20,23 @@ class SetsGameViewModel {
 
   func setupGame(with modelContext: ModelContext) {
     self.modelContext = modelContext
-    self.game = session.initializeSetsGame(with: modelContext)
   }
 
   // MARK: - Game Actions
   func selectCard(_ card: SetCard) {
     game.selectCard(card)
-    autoSave()
   }
 
   func deselectCard(_ card: SetCard) {
     game.deselectCard(card)
-    autoSave()
   }
 
   func shuffleCards() {
-    game.shuffleCards()
-    autoSave()
+    print("shuffle the cards")
   }
 
   func findHint() {
     game.findHint()
-    autoSave()
   }
 
   func resetSelection() {
@@ -50,14 +45,9 @@ class SetsGameViewModel {
 
   func checkSet() -> SetsGame.CheckResult {
     let result = game.checkForSet()
-    autoSave()
     return result
   }
 
-  private func autoSave() {
-    guard let modelContext = modelContext else { return }
-    session.saveSetsGameState(modelContext: modelContext)
-  }
 
   // MARK: - Computed Properties
 

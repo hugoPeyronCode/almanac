@@ -24,8 +24,7 @@ struct PracticeGameWrapper: View {
         Group {
             switch currentSession.gameType {
             case .pipe:
-                PipeGameView(session: currentSession)
-                    .id(sessionKey)
+              Text("PipeGame View Working from old Repo")
             case .shikaku:
                 ShikakuGameView(session: currentSession)
                     .id(sessionKey)

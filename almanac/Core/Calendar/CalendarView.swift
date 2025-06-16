@@ -121,7 +121,7 @@ struct CalendarView: View {
       handleFullScreen(destination)
     }
     .fullScreenCover(isPresented: $viewModel.showingPipeLevelEditor) {
-      PipeLevelEditorView()
+      Text("PipeLevel Editor when over")
     }
     .fullScreenCover(isPresented: $viewModel.showingFullCalendar) {
       CalendarFullView(
@@ -295,7 +295,7 @@ struct GamePlayView: View {
       } else {
         switch session.gameType {
         case .pipe:
-          PipeGameView(session: session)
+          Text("Pipe Game View Working from old repo")
         case .shikaku:
           ShikakuGameView(session: session)
         case .sets:
